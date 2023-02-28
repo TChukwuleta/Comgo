@@ -1,18 +1,15 @@
-﻿using Comgo.Core.Enums;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Comgo.Core.Entities
+namespace Comgo.Application.Common.Interfaces.Validators.UserValidator
 {
-    public class User
+    public interface IUserRequestValidator
     {
         public string Name { get; set; }
         public string Email { get; set; }
         public string Password { get; set; }
-        public string UserId { get; set; }
-        public Status Status { get; set; }
     }
 }

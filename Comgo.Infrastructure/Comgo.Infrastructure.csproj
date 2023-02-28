@@ -7,11 +7,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Folder Include="Data\" />
-    <Folder Include="Services\" />
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Include="CloudinaryDotNet" Version="1.20.0" />
     <PackageReference Include="Google.Protobuf" Version="3.22.0" />
     <PackageReference Include="Grpc.Core" Version="2.46.6" />
@@ -26,6 +21,14 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+  </ItemGroup>
+
+	<ItemGroup>
+		<Protobuf Include="Grpc\lightning.proto" GrpcServices="Client" />
+	</ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Comgo.Application\Comgo.Application.csproj" />
   </ItemGroup>
 
 </Project>
