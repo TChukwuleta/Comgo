@@ -23,12 +23,14 @@ namespace Comgo.Application.Users.Commands
     {
         private readonly IAuthService _authService;
         private readonly IAppDbContext _context;
+        private readonly IEmailService _emailService;
         private readonly IConfiguration _config;
-        public CreateUserCommandHandler(IAuthService authService, IAppDbContext context, IConfiguration config)
+        public CreateUserCommandHandler(IAuthService authService, IAppDbContext context, IConfiguration config, IEmailService emailService)
         {
             _authService = authService;
             _context = context;
             _config = config;
+            _emailService = emailService;
         }
 
         public async Task<Result> Handle(CreateUserCommand request, CancellationToken cancellationToken)
@@ -58,7 +60,17 @@ namespace Comgo.Application.Users.Commands
                 {
                     return Result.Failure(error);
                 }
-                return Result.Success("User creation was successful", newUser);
+                var generateOtp = await _authService.GenerateOTP(request.Email);
+                if (!generateOtp.Succeeded)
+                {
+                    return Result.Failure("An error occured when generating otp");
+                }
+                var sendEmail = await _emailService.SendEmailMessage(generateOtp.Entity.ToString());
+                if (!sendEmail)
+                {
+                    return Result.Failure("An error occured while sending email");
+                }
+                return Result.Success("User creation was successful. Kindly check your email for token", newUser);
             }
             catch (Exception ex)
             {

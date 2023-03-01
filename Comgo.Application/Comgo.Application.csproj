@@ -9,11 +9,17 @@
   <ItemGroup>
     <PackageReference Include="FluentValidation" Version="11.5.1" />
     <PackageReference Include="MediatR" Version="11.1.0" />
+    <PackageReference Include="NBitcoin" Version="7.0.24" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.2" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Comgo.Core\Comgo.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Lightnings\Queries\" />
+    <Folder Include="Paystacks\Queries\" />
   </ItemGroup>
 
 </Project>

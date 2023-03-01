@@ -31,6 +31,19 @@ namespace Comgo.Api.Controllers
             }
         }
 
+        [HttpPost("emailverification")]
+        public async Task<ActionResult<Result>> EmailVerification(EmailVerificationCommand command)
+        {
+            try
+            {
+                return await _mediator.Send(command);
+            }
+            catch (Exception ex)
+            {
+                return Result.Failure($"User verification was not successful. Error: {ex?.Message ?? ex?.InnerException?.Message}");
+            }
+        }
+
         [HttpPost("login")]
         public async Task<ActionResult<Result>> Login(UserLoginCommand command)
         {

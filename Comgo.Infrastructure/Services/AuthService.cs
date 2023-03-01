@@ -74,7 +74,8 @@ namespace Comgo.Infrastructure.Services
                     Status = Status.Deactivated,
                     UserName = user.Email,
                     NormalizedEmail = user.Email,
-                    HasPaid = false
+                    HasPaid = false,
+                    EmailConfirmed = false
                 };
                 var result = await _userManager.CreateAsync(newUser, user.Password);
                 if (!result.Succeeded)
@@ -118,7 +119,6 @@ namespace Comgo.Infrastructure.Services
                 }
                 user.EmailConfirmed = true;
                 user.Email = email;
-                user.Status = Status.Active;
                 var updatedUser = await _userManager.UpdateAsync(user);
                 await _context.SaveChangesAsync(new CancellationToken());
                 if (!updatedUser.Succeeded)
@@ -296,6 +296,30 @@ namespace Comgo.Infrastructure.Services
                 }
                 existingUser.Name = user.Name;
                 existingUser.Status = user.Status;
+                var update = await _userManager.UpdateAsync(existingUser);
+                if (!update.Succeeded)
+                {
+                    return Result.Failure("An error occured while updating user details. Please contact support");
+                }
+                return Result.Success("User details updated successfully");
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+
+        public async Task<Result> UpdateUserPaymentAsync(User user, bool paid)
+        {
+            try
+            {
+                var existingUser = await _userManager.FindByIdAsync(user.UserId);
+                if (existingUser == null)
+                {
+                    return Result.Failure("Invalid user details specified");
+                }
+                existingUser.HasPaid = paid;
+                existingUser.Status = Status.Active;
                 var update = await _userManager.UpdateAsync(existingUser);
                 if (!update.Succeeded)
                 {

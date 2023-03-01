@@ -12,6 +12,7 @@ namespace Comgo.Application.Common.Interfaces
     {
         Task<(Result result, User user)> CreateUserAsync(User user);
         Task<Result> UpdateUserAsync(User user);
+        Task<Result> UpdateUserPaymentAsync(User user, bool paid);
         Task<Result> ChangePasswordAsync(string email, string oldPassword, string newPassword);
         Task<Result> ResetPassword(string email, string password);
         Task<Result> EmailVerification(string email, string otp);
