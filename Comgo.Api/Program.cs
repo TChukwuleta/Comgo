@@ -96,6 +96,8 @@ builder.Services.AddTransient<ICloudinaryService, CloudinaryService>();
 builder.Services.AddTransient<IEmailService, EmailService>();
 builder.Services.AddTransient<ILightningService, LightningService>();
 builder.Services.AddTransient<IBitcoinService, BitcoinService>();
+builder.Services.AddTransient<IPaystackService, PaystackService>();
+builder.Services.AddTransient<IBitcoinCoreClient, BitcoinCoreClient>();
 
 
 

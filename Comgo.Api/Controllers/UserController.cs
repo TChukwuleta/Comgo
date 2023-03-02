@@ -1,4 +1,5 @@
-﻿using Comgo.Application.Users.Commands;
+﻿using Comgo.Application.BitcoinMethods.LoadWallet;
+using Comgo.Application.Users.Commands;
 using Comgo.Application.Users.Queries;
 using Comgo.Core.Model;
 using MediatR;
@@ -18,6 +19,21 @@ namespace Comgo.Api.Controllers
             _mediator = mediator;
         }
 
+
+        [HttpPost("testbitcoin")]
+        public async Task<ActionResult<Result>> TestBitcoinWallet(LoadWalletCommand command)
+        {
+            try
+            {
+                return await _mediator.Send(command);
+            }
+            catch (Exception ex)
+            {
+                return Result.Failure($"Bitcoin tests was not successful. Error: {ex?.Message ?? ex?.InnerException?.Message}");
+            }
+        }
+
+        
         [HttpPost("create")]
         public async Task<ActionResult<Result>> CreateUser(CreateUserCommand command)
         {

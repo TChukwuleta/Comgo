@@ -94,21 +94,7 @@ namespace Comgo.Api.Controllers
 
         [HttpGet("getalldebit/{skip}/{take}/{userid}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        public async Task<ActionResult<Result>> GetAllCreditTransactionsByUser(int skip, int take, string userid)
-        {
-            try
-            {
-                return await Mediator.Send(new GetDebitTransactionByUserIdQuery { UserId = userid, Skip = skip, Take = take });
-            }
-            catch (Exception ex)
-            {
-                return Result.Failure($"Debit transactions retrieval failed. Error: {ex?.Message ?? ex?.InnerException?.Message}");
-            }
-        }
-
-        [HttpGet("getalldebit/{skip}/{take}/{userid}")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        public async Task<ActionResult<Result>> GetDebitTransactionsByAccountNumber(int skip, int take, string userid)
+        public async Task<ActionResult<Result>> GetDebitTransactionsByUer(int skip, int take, string userid)
         {
             try
             {
