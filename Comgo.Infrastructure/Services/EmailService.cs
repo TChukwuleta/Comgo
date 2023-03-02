@@ -17,7 +17,7 @@ namespace Comgo.Infrastructure.Services
         {
             _config = config;
         }
-        public async Task<bool> SendEmailMessage(string body)
+        public async Task<bool> SendEmailMessage(string body, string subject)
         {
             var username = _config["SMTP:Username"];
             var password = _config["SMTP:Password"];
@@ -28,7 +28,7 @@ namespace Comgo.Infrastructure.Services
                 var email = new MimeMessage();
                 email.From.Add(MailboxAddress.Parse(username));
                 email.To.Add(MailboxAddress.Parse(username));
-                email.Subject = "New User Regstration";
+                email.Subject = subject;
                 email.Body = new TextPart(MimeKit.Text.TextFormat.Plain) { Text = body };
                 using var smtp = new SmtpClient();
                 smtp.Connect(host, port, MailKit.Security.SecureSocketOptions.StartTls);

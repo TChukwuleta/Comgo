@@ -14,5 +14,6 @@ namespace Comgo.Core.Entities
         public string Password { get; set; }
         public string UserId { get; set; }
         public Status Status { get; set; }
+        public UserType UserType { get; set; }
     }
 }

@@ -93,7 +93,9 @@ builder.Services.AddScoped<IAppDbContext>(prov => prov.GetService<AppDbContext>(
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddTransient<IEncryptionService, EncryptionService>();
 builder.Services.AddTransient<ICloudinaryService, CloudinaryService>();
+builder.Services.AddTransient<IEmailService, EmailService>();
 builder.Services.AddTransient<ILightningService, LightningService>();
+builder.Services.AddTransient<IBitcoinService, BitcoinService>();
 
 
 

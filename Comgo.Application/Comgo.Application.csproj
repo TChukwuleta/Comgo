@@ -20,6 +20,7 @@
   <ItemGroup>
     <Folder Include="Lightnings\Queries\" />
     <Folder Include="Paystacks\Queries\" />
+    <Folder Include="Signatures\Queries\" />
   </ItemGroup>
 
 </Project>

@@ -13,6 +13,8 @@ namespace Comgo.Application.Common.Interfaces
     {
         DbSet<AppUser> AppUsers { get; set; }
         DbSet<Transaction> Transactions { get; set; }
+        DbSet<Signature> Signatures { get; set; }
+        DbSet<Unit> Units { get; set; }
         Task<int> SaveChangesAsync(CancellationToken cancellationToken);
     }
 }

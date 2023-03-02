@@ -75,7 +75,8 @@ namespace Comgo.Infrastructure.Services
                     UserName = user.Email,
                     NormalizedEmail = user.Email,
                     HasPaid = false,
-                    EmailConfirmed = false
+                    EmailConfirmed = false,
+                    UserType = user.UserType
                 };
                 var result = await _userManager.CreateAsync(newUser, user.Password);
                 if (!result.Succeeded)
@@ -177,6 +178,30 @@ namespace Comgo.Infrastructure.Services
                     });
                 }
                 return (Result.Success("Users retrieval was successful"), users);
+            }
+            catch (Exception ex)
+            {
+
+                throw ex;
+            }
+        }
+
+        public async Task<(Result result, User user)> GetSuperAdmin()
+        {
+            try
+            {
+                var superAdmin = await _userManager.Users.FirstOrDefaultAsync(c => c.UserType == UserType.SuperAdmin);
+                if (superAdmin == null)
+                {
+                    return (Result.Failure("Super admin user does not exist"), null);
+                }
+                var user = new User
+                {
+                    Name = superAdmin.Name,
+                    Email = superAdmin.Email,
+                    UserId = superAdmin.UserId,
+                };
+                return (Result.Success("Super admin user details retrieval was successful"), user);
             }
             catch (Exception ex)
             {

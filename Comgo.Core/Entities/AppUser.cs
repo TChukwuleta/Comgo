@@ -16,6 +16,7 @@ namespace Comgo.Core.Entities
         public decimal Balance { get; set; }
         public string UserId { get; set; }
         public Status Status { get; set; }
+        public UserType UserType { get; set; }
         public ICollection<Unit> Units { get; set; }
         public string StatusDesc { get { return Status.ToString(); } }
     }

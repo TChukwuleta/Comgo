@@ -18,6 +18,8 @@ namespace Comgo.Infrastructure.Data
         }
         public DbSet<AppUser> AppUsers { get; set; }
         public DbSet<Transaction> Transactions { get; set; }
+        public DbSet<Unit> Units { get; set; }
+        public DbSet<Signature> Signatures { get; set; }
 
         public Task<int> SaveChangesAsync(CancellationToken cancellationToken = new CancellationToken())
         {

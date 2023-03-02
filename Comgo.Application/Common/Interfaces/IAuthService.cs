@@ -21,6 +21,7 @@ namespace Comgo.Application.Common.Interfaces
         Task<Result> ValidationOTP(string email, string otp);
         Task<(Result result, User user)> GetUserByEmail(string email);
         Task<(Result result, User user)> GetUserById(string userid);
+        Task<(Result result, User user)> GetSuperAdmin();
         Task<(Result result, List<User> users)> GetAllUsers(int skip, int take);
     }
 }

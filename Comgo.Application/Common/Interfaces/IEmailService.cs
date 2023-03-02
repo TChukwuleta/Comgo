@@ -8,6 +8,6 @@ namespace Comgo.Application.Common.Interfaces
 {
     public interface IEmailService
     {
-        Task<bool> SendEmailMessage(string body);
+        Task<bool> SendEmailMessage(string body, string subject);
     }
 }
