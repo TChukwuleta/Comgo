@@ -1,14 +1,13 @@
 ﻿using Comgo.Application.Common.Interfaces;
+using Comgo.Application.Common.Model.Response.BitcoinCommandResponses;
 using Comgo.Core.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using NBitcoin;
+using NBXplorer.DerivationStrategy;
 using Newtonsoft.Json;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.IO;
 
 namespace Comgo.Infrastructure.Services
 {
@@ -19,10 +18,13 @@ namespace Comgo.Infrastructure.Services
         private readonly IAppDbContext _context;
         private readonly IEncryptionService _encryptionService;
         private readonly IAuthService _authService;
-        public BitcoinService(IConfiguration config, IEmailService emailService, IAppDbContext context, IEncryptionService encryptionService, IAuthService authService)
+        private readonly IBitcoinCoreClient _bitcoinCoreClient;
+        public BitcoinService(IConfiguration config, IEmailService emailService, IAppDbContext context, 
+            IEncryptionService encryptionService, IAuthService authService, IBitcoinCoreClient bitcoinCoreClient)
         {
             _config = config;
             _authService = authService;
+            _bitcoinCoreClient = bitcoinCoreClient;
             _encryptionService = encryptionService;
             _emailService = emailService;
             _context = context;
@@ -100,6 +102,22 @@ namespace Comgo.Infrastructure.Services
             }
         }
 
+        public async Task<MultisigAddressCreationResponse> GenerateMultisigAddressBitcoinCore(string userpublickey, string adminpublickey, string methodname, int minimumKeys)
+        {
+            try
+            {
+                var keysList = new List<string> { userpublickey, adminpublickey };
+                var bitcoinMultisigAddress = await _bitcoinCoreClient.BitcoinRequestServer(methodname, keysList, minimumKeys);
+                var multisigAddress = JsonConvert.DeserializeObject<MultisigAddressCreationResponse>(bitcoinMultisigAddress);
+                return multisigAddress;
+            }
+            catch (Exception ex)
+            {
+
+                throw ex;
+            }
+        }
+
         public async Task<Signature> GenerateSystemKey(string userId)
         {
             var network = Network.RegTest;
@@ -126,6 +144,56 @@ namespace Comgo.Infrastructure.Services
             catch (Exception ex)
             {
                 throw;
+            }
+        }
+
+        public async Task<string> GetRawTransactionBitcoinCore(string txnid)
+        {
+            try
+            {
+                return "Balablu";
+            }
+            catch (Exception ex)
+            {
+
+                throw ex;
+            }
+        }
+
+        public async Task<string> TestMultisig(string privKey, string userId, string email)
+        {
+            try
+            {
+                // Get wallet information;;
+                var walletInfoResponse = await _bitcoinCoreClient.WalletInformation(email, "getwalletinfo");
+                var walletInfo = JsonConvert.DeserializeObject<GetWalletResponse>(walletInfoResponse);
+
+                // Get new address
+                var newAddressResponse = await _bitcoinCoreClient.WalletInformation(email, "getnewaddress");
+                var newAddress = JsonConvert.DeserializeObject<GenericResponse>(newAddressResponse);
+
+                var address = newAddress.result;
+
+                /*var network = Network.RegTest;
+                var alice = new Party(new Mnemonic(Wordlist.English), "Alice",
+                                 new KeyPath("1'/2'/3'"));
+                var bob = new Party(new Mnemonic(Wordlist.English), "Bob",
+                                    new KeyPath("5'/2'/3'"));
+
+
+                var factory = new DerivationStrategyFactory(network);
+                var derivationStrategy = factory.CreateMultiSigDerivationStrategy(new[]
+                {
+                    alice.AccountExtPubKey.GetWif(network),
+                    bob.AccountExtPubKey.GetWif(network)
+                }, 2, new DerivationStrategyOptions() { ScriptPubKeyType = ScriptPubKeyType.SegwitP2SH });*/
+
+                return "Done";
+            }
+            catch (Exception ex)
+            {
+
+                throw ex;
             }
         }
     }

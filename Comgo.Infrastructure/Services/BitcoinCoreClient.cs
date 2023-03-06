@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -26,6 +27,64 @@ namespace Comgo.Infrastructure.Services
             serverIp = _config["Bitcoin:URl"];
             username = _config["Bitcoin:username"];
             password = _config["Bitcoin:password"];
+        }
+
+        public async Task<string> BitcoinRequestServer(string methodName, List<JToken> parameters, int count)
+        {
+            string response = default;
+            try
+            {
+                HttpWebRequest webRequest = (HttpWebRequest)WebRequest.Create(serverIp);
+                webRequest.Credentials = new NetworkCredential(username, password);
+                webRequest.Method = "POST";
+                webRequest.ContentType = "application/json-rpc";
+
+                JObject joe = new JObject();
+                joe.Add(new JProperty("jsonrpc", "1.0"));
+                joe.Add(new JProperty("id", "curltest"));
+                joe.Add(new JProperty("method", methodName));
+                JArray props = new JArray();
+                foreach (var parameter in parameters)
+                {
+                    props.Add(parameter);
+                }
+                JArray paramsProps = new JArray();
+                paramsProps.Add(count);
+                paramsProps.Add(props);
+                joe.Add(new JProperty("params", paramsProps));
+
+                string s = JsonConvert.SerializeObject(joe);
+                byte[] byteArray = Encoding.UTF8.GetBytes(s);
+                webRequest.ContentLength = byteArray.Length;
+                Stream stream = webRequest.GetRequestStream();
+                stream.Write(byteArray, 0, byteArray.Length);
+                stream.Close();
+
+                StreamReader streamReader = null;
+                WebResponse webResponse = webRequest.GetResponse();
+                streamReader = new StreamReader(webResponse.GetResponseStream(), true);
+                response = streamReader.ReadToEnd();
+                var data = JsonConvert.DeserializeObject(response).ToString();
+                return data;
+            }
+            catch (Exception ex)
+            {
+
+                throw ex;
+            }
+        }
+
+        public async Task<string> BitcoinRequestServer(string methodName, List<string> parameters, int count)
+        {
+            try
+            {
+                return await BitcoinRequestServer(methodName, parameters.Select(c => new JValue(c)).ToList<JToken>(), count);
+            }
+            catch (Exception ex)
+            {
+
+                throw ex;
+            }
         }
 
         public async Task<string> BitcoinRequestServer(string methodName, List<JToken> parameters)
@@ -135,6 +194,81 @@ namespace Comgo.Infrastructure.Services
                 joe.Add(new JProperty("jsonrpc", "1.0"));
                 joe.Add(new JProperty("id", "curltext"));
                 joe.Add(new JProperty("method", methodName));
+                joe.Add(new JProperty("params", props));
+                string s = JsonConvert.SerializeObject(joe);
+                byte[] bytes = Encoding.UTF8.GetBytes(s);
+                webRequest.ContentLength = bytes.Length;
+                Stream stream = webRequest.GetRequestStream();
+                stream.Write(bytes, 0, bytes.Length);
+                stream.Close();
+
+                StreamReader streamReader = null;
+                WebResponse webResponse = webRequest.GetResponse();
+                streamReader = new StreamReader(webResponse.GetResponseStream(), true);
+                response = streamReader.ReadToEnd();
+                var data = JsonConvert.DeserializeObject(response).ToString();
+                return data;
+            }
+            catch (Exception ex)
+            {
+
+                throw ex;
+            }
+        }
+
+        public async Task<string> BitcoinRequestServer(string methodName, string parameters, int value)
+        {
+            string response = default;
+            try
+            {
+                HttpWebRequest webRequest = (HttpWebRequest)WebRequest.Create(serverIp);
+                webRequest.Credentials = new NetworkCredential(username, password);
+                webRequest.Method = "POST";
+                webRequest.ContentType = "application/json-rpc";
+                JObject joe = new JObject();
+                JArray props = new JArray();
+                joe.Add(new JProperty("jsonrpc", "1.0"));
+                joe.Add(new JProperty("id", "curltext"));
+                joe.Add(new JProperty("method", methodName));
+                props.Add(value);
+                props.Add(parameters);
+                joe.Add(new JProperty("params", props));
+                string s = JsonConvert.SerializeObject(joe);
+                byte[] bytes = Encoding.UTF8.GetBytes(s);
+                webRequest.ContentLength = bytes.Length;
+                Stream stream = webRequest.GetRequestStream();
+                stream.Write(bytes, 0, bytes.Length);
+                stream.Close();
+
+                StreamReader streamReader = null;
+                WebResponse webResponse = webRequest.GetResponse();
+                streamReader = new StreamReader(webResponse.GetResponseStream(), true);
+                response = streamReader.ReadToEnd();
+                var data = JsonConvert.DeserializeObject(response).ToString();
+                return data;
+            }
+            catch (Exception ex)
+            {
+
+                throw ex;
+            }
+        }
+
+        public async Task<string> WalletInformation(string walletname, string methodname)
+        {
+            string response = default;
+            var url = $"{serverIp}/wallet/{walletname}";
+            try
+            {
+                HttpWebRequest webRequest = (HttpWebRequest)WebRequest.Create(url);
+                webRequest.Credentials = new NetworkCredential(username, password);
+                webRequest.Method = "POST";
+                webRequest.ContentType = "application/json-rpc";
+                JObject joe = new JObject();
+                JArray props = new JArray();
+                joe.Add(new JProperty("jsonrpc", "1.0"));
+                joe.Add(new JProperty("id", "curltext"));
+                joe.Add(new JProperty("method", methodname));
                 joe.Add(new JProperty("params", props));
                 string s = JsonConvert.SerializeObject(joe);
                 byte[] bytes = Encoding.UTF8.GetBytes(s);
