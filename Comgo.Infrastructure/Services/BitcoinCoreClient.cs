@@ -1,6 +1,7 @@
 ﻿using Comgo.Application.Common.Interfaces;
 using Comgo.Core.Model;
 using Microsoft.Extensions.Configuration;
+using NBitcoin;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
@@ -29,12 +30,17 @@ namespace Comgo.Infrastructure.Services
             password = _config["Bitcoin:password"];
         }
 
-        public async Task<string> BitcoinRequestServer(string methodName, List<JToken> parameters, int count)
+        public async Task<string> BitcoinRequestServer(string walletname, string methodName, List<JToken> parameters, int count)
         {
             string response = default;
+            var url = serverIp;
+            if (!string.IsNullOrEmpty(walletname))
+            {
+                url = $"{url}/wallet/{walletname}";
+            }
             try
             {
-                HttpWebRequest webRequest = (HttpWebRequest)WebRequest.Create(serverIp);
+                HttpWebRequest webRequest = (HttpWebRequest)WebRequest.Create(url);
                 webRequest.Credentials = new NetworkCredential(username, password);
                 webRequest.Method = "POST";
                 webRequest.ContentType = "application/json-rpc";
@@ -74,11 +80,11 @@ namespace Comgo.Infrastructure.Services
             }
         }
 
-        public async Task<string> BitcoinRequestServer(string methodName, List<string> parameters, int count)
+        public async Task<string> BitcoinRequestServer(string walletname, string methodName, List<string> parameters, int count)
         {
             try
             {
-                return await BitcoinRequestServer(methodName, parameters.Select(c => new JValue(c)).ToList<JToken>(), count);
+                return await BitcoinRequestServer(walletname, methodName, parameters.Select(c => new JValue(c)).ToList<JToken>(), count);
             }
             catch (Exception ex)
             {
@@ -142,11 +148,16 @@ namespace Comgo.Infrastructure.Services
             }
         }
 
-        public async Task<string> BitcoinRequestServer(string methodName, string parameters)
+        public async Task<string> BitcoinRequestServer(string walletname, string methodName, string parameters)
         {
             try
             {
-                HttpWebRequest webRequest = (HttpWebRequest)WebRequest.Create(serverIp);
+                var url = serverIp;
+                if (!string.IsNullOrEmpty(walletname))
+                {
+                    url = $"{url}/wallet/{walletname}";
+                }
+                HttpWebRequest webRequest = (HttpWebRequest)WebRequest.Create(url);
                 webRequest.Credentials = new NetworkCredential(username, password);
                 webRequest.ContentType = "application/json-rpc";
                 webRequest.Method = "POST";
@@ -257,7 +268,14 @@ namespace Comgo.Infrastructure.Services
         public async Task<string> WalletInformation(string walletname, string methodname)
         {
             string response = default;
-            var url = $"{serverIp}/wallet/{walletname}";
+            var url = serverIp;
+            if (!string.IsNullOrEmpty(walletname))
+            {
+                url = $"{serverIp}/wallet/{walletname}";
+            }
+
+            var key = new Key();
+            var st = key.GetBitcoinSecret(Network.TestNet);
             try
             {
                 HttpWebRequest webRequest = (HttpWebRequest)WebRequest.Create(url);

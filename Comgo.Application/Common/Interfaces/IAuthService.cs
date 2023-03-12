@@ -17,11 +17,11 @@ namespace Comgo.Application.Common.Interfaces
         Task<Result> ResetPassword(string email, string password);
         Task<Result> EmailVerification(string email, string otp);
         Task<Result> Login(string email, string password);
-        Task<Result> GenerateOTP(string email);
-        Task<Result> ValidationOTP(string email, string otp);
+        Task<Result> GenerateOTP(string email, string purpose);
+        Task<Result> ValidationOTP(string email, string otp, string purpose);
         Task<(Result result, User user)> GetUserByEmail(string email);
         Task<(Result result, User user)> GetUserById(string userid);
-        Task<(Result result, User user)> GetSuperAdmin();
+        Task<(Result result, User user)> GetSuperAdmin(string userid);
         Task<(Result result, List<User> users)> GetAllUsers(int skip, int take);
     }
 }

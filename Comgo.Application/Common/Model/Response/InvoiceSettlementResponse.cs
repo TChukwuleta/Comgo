@@ -18,6 +18,6 @@ namespace Comgo.Application.Common.Model.Response
         public bool Private { get; set; }
         public long AmountInSat { get; set; }
         public int PostId { get; set; }
-        public string UserId { get; set; }
+        public string Email { get; set; }
     }
 }

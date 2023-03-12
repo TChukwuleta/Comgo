@@ -25,9 +25,10 @@ namespace Comgo.Application.Users.Commands
         private readonly IAuthService _authService;
         private readonly ILightningService _lightningService;
         private readonly IPaystackService _paystackService;
-        public PaymentServiceCommandHandler(IConfiguration config, IAuthService authService, IPaystackService paystackService)
+        public PaymentServiceCommandHandler(IConfiguration config, IAuthService authService, IPaystackService paystackService, ILightningService lightningService)
         {
             _config = config;
+            _lightningService = lightningService;
             _authService = authService;
             _paystackService = paystackService;
         }
@@ -35,7 +36,7 @@ namespace Comgo.Application.Users.Commands
         public async Task<Result> Handle(PaymentServiceCommand request, CancellationToken cancellationToken)
         {
             var reference = $"Comgo_{DateTime.Now.Ticks}";
-            var lightningFees = _config["ServiceCharge:LightningFeeSats"];
+            var lightningFees = int.Parse(_config["ServiceCharge:LightningFeeSats"]);
             var nairaFees = _config["ServiceCharge:NairaFee"];
             try
             {
@@ -49,7 +50,7 @@ namespace Comgo.Application.Users.Commands
                     case PaymentModeType.Bitcoin:
                         return Result.Failure("Coming soon. Kindly choose other form of payment");
                     case PaymentModeType.Lightning:
-                        var generateLightning = await _lightningService.CreateInvoice(long.Parse(lightningFees), request.Email, UserType.Admin);
+                        var generateLightning = await _lightningService.CreateInvoice(lightningFees, request.Email);
                         if (string.IsNullOrEmpty(generateLightning))
                         {
                             return Result.Failure("An error occured while generating invoice");

@@ -10,10 +10,10 @@ namespace Comgo.Application.Common.Interfaces
 {
     public interface ILightningService
     {
-        Task<string> CreateInvoice(long satoshis, string message, UserType userType);
+        Task<string> CreateInvoice(long satoshis, string message);
         Task<long> GetChannelBalance(UserType userType);
         Task<long> GetWalletBalance(UserType userType);
         Task<string> SendLightning(string paymentRequest, UserType userType);
-        Task<InvoiceSettlementResponse> ListenForSettledInvoice(UserType userType);
+        Task<InvoiceSettlementResponse> ListenForSettledInvoice();
     }
 }

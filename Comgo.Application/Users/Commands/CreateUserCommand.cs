@@ -62,12 +62,12 @@ namespace Comgo.Application.Users.Commands
                 {
                     return Result.Failure(error);
                 }
-                var generateOtp = await _authService.GenerateOTP(request.Email);
+                var generateOtp = await _authService.GenerateOTP(request.Email, "user-creation");
                 if (!generateOtp.Succeeded)
                 {
                     return Result.Failure("An error occured when generating otp");
                 }
-                var sendEmail = await _emailService.SendEmailMessage(generateOtp.Entity.ToString(), "New User Regstration");
+                var sendEmail = await _emailService.SendEmailMessage(generateOtp.Entity.ToString(), "New User Regstration", request.Email);
                 if (!sendEmail)
                 {
                     return Result.Failure("An error occured while sending email");
@@ -76,7 +76,7 @@ namespace Comgo.Application.Users.Commands
             }
             catch (Exception ex)
             {
-                return Result.Failure(new string[] { "User creation failed", ex?.Message ?? ex?.InnerException.Message });
+                return Result.Failure("User creation failed", ex?.Message ?? ex?.InnerException.Message);
             }
         }
     }

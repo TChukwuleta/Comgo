@@ -14,10 +14,12 @@ namespace Comgo.Core.Entities
         public string Email { get; set; }
         public bool HasPaid { get; set; }
         public decimal Balance { get; set; }
+        public string UserSigTree { get; set; }
         public string UserId { get; set; }
         public Status Status { get; set; }
         public UserType UserType { get; set; }
         public ICollection<Unit> Units { get; set; }
         public string StatusDesc { get { return Status.ToString(); } }
+        public ICollection<UserCustody> UserCustodies { get; set; }
     }
 }

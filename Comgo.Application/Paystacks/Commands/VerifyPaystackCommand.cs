@@ -1,13 +1,6 @@
 ﻿using Comgo.Application.Common.Interfaces;
-using Comgo.Application.Common.Model.Request;
-using Comgo.Core.Enums;
 using Comgo.Core.Model;
 using MediatR;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Comgo.Application.Paystacks.Commands
 {
@@ -21,10 +14,12 @@ namespace Comgo.Application.Paystacks.Commands
     {
         private readonly IAuthService _authService;
         private readonly IPaystackService _paystackService;
+        private readonly IBitcoinService _bitcoinService;
 
-        public VerifyPaystackCommandHandler(IAuthService authService, IPaystackService paystackService)
+        public VerifyPaystackCommandHandler(IAuthService authService, IPaystackService paystackService, IBitcoinService bitcoinService)
         {
             _authService = authService;
+            _bitcoinService = bitcoinService;
             _paystackService = paystackService;
         }
 
@@ -48,6 +43,8 @@ namespace Comgo.Application.Paystacks.Commands
                 {
                     return Result.Failure(verifyPaymentResponse);
                 }
+
+                var createCustody = await _bitcoinService.CreateNewKeyPair(user.user.UserId);
                 return Result.Success("Payment verification was successful. User can now proceed with this application");
             }
             catch (Exception ex)

@@ -1,4 +1,6 @@
 ﻿using Comgo.Application.BitcoinMethods.LoadWallet;
+using Comgo.Application.Lightnings.Commands;
+using Comgo.Application.Paystacks.Commands;
 using Comgo.Application.Users.Commands;
 using Comgo.Application.Users.Queries;
 using Comgo.Core.Model;
@@ -57,6 +59,45 @@ namespace Comgo.Api.Controllers
             catch (Exception ex)
             {
                 return Result.Failure($"User verification was not successful. Error: {ex?.Message ?? ex?.InnerException?.Message}");
+            }
+        }
+
+        [HttpPost("servicepayment")]
+        public async Task<ActionResult<Result>> ServicePayment(PaymentServiceCommand command)
+        {
+            try
+            {
+                return await _mediator.Send(command);
+            }
+            catch (Exception ex)
+            {
+                return Result.Failure($"Service payment was not successful. Error: {ex?.Message ?? ex?.InnerException?.Message}");
+            }
+        }
+
+        [HttpPost("verifypaystackpayment")]
+        public async Task<ActionResult<Result>> VerifyPaystackPayment(VerifyPaystackCommand command)
+        {
+            try
+            {
+                return await _mediator.Send(command);
+            }
+            catch (Exception ex)
+            {
+                return Result.Failure($"Payment verification was not successful. Error: {ex?.Message ?? ex?.InnerException?.Message}");
+            }
+        }
+
+        [HttpPost("listenforpayment")]
+        public async Task<ActionResult<Result>> ListenForPayment(ListenForInvoiceCommand command)
+        {
+            try
+            {
+                return await _mediator.Send(command);
+            }
+            catch (Exception ex)
+            {
+                return Result.Failure($"Payment verification was not successful. Error: {ex?.Message ?? ex?.InnerException?.Message}");
             }
         }
 

@@ -12,6 +12,7 @@ namespace Comgo.Application.Common.Interfaces
     public interface IAppDbContext
     {
         DbSet<AppUser> AppUsers { get; set; }
+        DbSet<UserCustody> UserCustodies { get; set; }
         DbSet<Transaction> Transactions { get; set; }
         DbSet<Signature> Signatures { get; set; }
         DbSet<Unit> Units { get; set; }

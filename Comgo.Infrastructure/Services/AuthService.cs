@@ -75,7 +75,7 @@ namespace Comgo.Infrastructure.Services
                     UserName = user.Email,
                     NormalizedEmail = user.Email,
                     HasPaid = false,
-                    EmailConfirmed = false,
+                    EmailConfirmed = true,
                     UserType = user.UserType
                 };
                 var result = await _userManager.CreateAsync(newUser, user.Password);
@@ -84,7 +84,6 @@ namespace Comgo.Infrastructure.Services
                     var errors = result.Errors.Select(c => c.Description);
                     return (Result.Failure(errors), null);
                 }
-                newUser.UserId = newUser.Id;
                 newUser.Email = user.Email;
                 await _userManager.UpdateAsync(newUser);
                 await _context.SaveChangesAsync(new CancellationToken());
@@ -113,7 +112,7 @@ namespace Comgo.Infrastructure.Services
                 {
                     return Result.Failure("Invalid user details specified");
                 }
-                var otpValidation = await ValidationOTP(email, otp);
+                var otpValidation = await ValidationOTP(email, otp, "user-creation");
                 if (!otpValidation.Succeeded)
                 {
                     return Result.Failure(otpValidation.Message);
@@ -135,7 +134,7 @@ namespace Comgo.Infrastructure.Services
             }
         }
 
-        public async Task<Result> GenerateOTP(string email)
+        public async Task<Result> GenerateOTP(string email, string purpose)
         {
             try
             {
@@ -144,7 +143,7 @@ namespace Comgo.Infrastructure.Services
                 {
                     return Result.Failure("Invalid user specified");
                 }
-                var otp = await _userManager.GenerateTwoFactorTokenAsync(user, email);
+                var otp = await _userManager.GenerateUserTokenAsync(user, "Email", purpose);
                 if (otp == null)
                 {
                     return Result.Failure("Unable to generate OTP. Kindly contact support");
@@ -157,6 +156,8 @@ namespace Comgo.Infrastructure.Services
                 throw ex;
             }
         }
+
+
 
         public async Task<(Result result, List<User> users)> GetAllUsers(int skip, int take)
         {
@@ -174,7 +175,8 @@ namespace Comgo.Infrastructure.Services
                     {
                         Name = appUser.Name,
                         Email = appUser.Email,
-                        UserId = appUser.UserId
+                        UserId = appUser.Id,
+                        Status = appUser.Status,
                     });
                 }
                 return (Result.Success("Users retrieval was successful"), users);
@@ -186,21 +188,32 @@ namespace Comgo.Infrastructure.Services
             }
         }
 
-        public async Task<(Result result, User user)> GetSuperAdmin()
+        public async Task<(Result result, User user)> GetSuperAdmin(string userid)
         {
             try
             {
-                var superAdmin = await _userManager.Users.FirstOrDefaultAsync(c => c.UserType == UserType.SuperAdmin);
+                var superAdmin = await _userManager.Users.Include(c => c.UserCustodies).FirstOrDefaultAsync(c => c.UserType == UserType.SuperAdmin);
                 if (superAdmin == null)
                 {
                     return (Result.Failure("Super admin user does not exist"), null);
                 }
+
                 var user = new User
                 {
                     Name = superAdmin.Name,
-                    Email = superAdmin.Email,
-                    UserId = superAdmin.UserId,
+                    Email = superAdmin.UserName,
+                    UserId = superAdmin.Id,
+                    Status = superAdmin.Status,
                 };
+
+                if (!string.IsNullOrEmpty(userid))
+                {
+                    var userMatch = superAdmin.UserCustodies.FirstOrDefault(c => c.UserId == userid);
+                    if (userMatch != null)
+                    {
+                        user.Key = userMatch.Key;
+                    }
+                }
                 return (Result.Success("Super admin user details retrieval was successful"), user);
             }
             catch (Exception ex)
@@ -222,8 +235,9 @@ namespace Comgo.Infrastructure.Services
                 var user = new User
                 {
                     Name = existingUser.Name,
-                    Email = existingUser.Email,
-                    UserId = existingUser.UserId,
+                    Email = existingUser.UserName,
+                    UserId = existingUser.Id,
+                    Status = existingUser.Status,
                 };
                 return (Result.Success("User details retrieval was successful"), user);
             }
@@ -247,7 +261,8 @@ namespace Comgo.Infrastructure.Services
                 {
                     Name = existingUser.Name,
                     Email = existingUser.UserName,
-                    UserId = existingUser.UserId,
+                    UserId = existingUser.Id,
+                    Status = existingUser.Status,
                 };
                 return (Result.Success("User details retrieval was successful"), user);
             }
@@ -272,7 +287,11 @@ namespace Comgo.Infrastructure.Services
                 {
                     return Result.Failure("Invalid email or password specified");
                 }
-                var jwtToken = GenerateJwtToken(user.UserId, user.UserName);
+                if (user.Status != Status.Active)
+                {
+                    return Result.Failure("User is not yet activated");
+                }
+                var jwtToken = GenerateJwtToken(user.Id, user.UserName);
                 return Result.Success(jwtToken);
             }
             catch (Exception ex)
@@ -344,7 +363,10 @@ namespace Comgo.Infrastructure.Services
                     return Result.Failure("Invalid user details specified");
                 }
                 existingUser.HasPaid = paid;
-                existingUser.Status = Status.Active;
+                if (paid)
+                {
+                    existingUser.Status = Status.Active;
+                }
                 var update = await _userManager.UpdateAsync(existingUser);
                 if (!update.Succeeded)
                 {
@@ -358,7 +380,7 @@ namespace Comgo.Infrastructure.Services
             }
         }
 
-        public async Task<Result> ValidationOTP(string email, string otp)
+        public async Task<Result> ValidationOTP(string email, string otp, string purpose)
         {
             try
             {
@@ -367,7 +389,7 @@ namespace Comgo.Infrastructure.Services
                 {
                     return Result.Failure("Invalid user details specified");
                 }
-                var validate = await _userManager.VerifyTwoFactorTokenAsync(user, email, otp);
+                var validate = await _userManager.VerifyUserTokenAsync(user, "Email", purpose, otp);
                 if (!validate)
                 {
                     return Result.Failure("Error validating OTP");

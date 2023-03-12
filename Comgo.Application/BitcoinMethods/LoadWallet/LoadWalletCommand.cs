@@ -11,6 +11,7 @@ namespace Comgo.Application.BitcoinMethods.LoadWallet
 {
     public class LoadWalletCommand : IRequest<Result>
     {
+        public string Parameter { get; set; }
         public string WalletName { get; set; }
         public string MethodName { get; set; }
     }

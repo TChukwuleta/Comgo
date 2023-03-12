@@ -18,24 +18,26 @@ namespace Comgo.Application.Lightnings.Commands
         private readonly IAuthService _authService;
         private readonly ILightningService _lightningService;
         private readonly IAppDbContext _context;
-        public ListenForInvoiceCommandHandler(IAuthService authService, ILightningService lightningService, IAppDbContext context)
+        private readonly IBitcoinService _bitcoinService;
+        public ListenForInvoiceCommandHandler(IAuthService authService, ILightningService lightningService, IAppDbContext context, IBitcoinService bitcoinService)
         {
             _authService = authService;
             _lightningService = lightningService;
             _context = context;
+            _bitcoinService = bitcoinService;
         }
 
         public async Task<Result> Handle(ListenForInvoiceCommand request, CancellationToken cancellationToken)
         {
             try
             {
-                var listener = await _lightningService.ListenForSettledInvoice(Core.Enums.UserType.Admin);
+                var listener = await _lightningService.ListenForSettledInvoice();
                 if (listener == null)
                 {
                     return Result.Failure("An error occured.");
                 }
 
-                var user = await _authService.GetUserById(listener.UserId);
+                var user = await _authService.GetUserByEmail(listener.Email);
                 if (user.user == null)
                 {
                     return Result.Failure("An error occured while confirming payment receipt. Invalid user details");
@@ -46,6 +48,7 @@ namespace Comgo.Application.Lightnings.Commands
                 {
                     return Result.Failure($"An error occured while confirming payment receipt. {paymentUpdateMessage}");
                 }
+                var createCustody = await _bitcoinService.CreateNewKeyPair(user.user.UserId);
                 return Result.Success("Invoice has been confirmed successfully.", listener);
             }
             catch (Exception ex)

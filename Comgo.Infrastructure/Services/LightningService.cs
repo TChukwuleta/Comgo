@@ -21,25 +21,14 @@ namespace Comgo.Infrastructure.Services
             _config = config;
         }
 
-        public async Task<string> CreateInvoice(long satoshis, string message, UserType userType)
+        public async Task<string> CreateInvoice(long satoshis, string message)
         {
             string paymentRequest = default;
             var helper = new LightningHelper(_config);
             try
             {
-                switch (userType)
-                {
-                    case UserType.User:
-                        var userInvoice = helper.CreateUserInvoice(satoshis, message);
-                        paymentRequest = userInvoice.PaymentRequest;
-                        break;
-                    case UserType.Admin:
-                        var adminInvoice = helper.CreateAdminInvoice(satoshis, message);
-                        paymentRequest = adminInvoice.PaymentRequest;
-                        break;
-                    default:
-                        break;
-                }
+                var adminInvoice = helper.CreateAdminInvoice(satoshis, message);
+                paymentRequest = adminInvoice.PaymentRequest;
                 return paymentRequest;
             }
             catch (Exception ex)
@@ -107,7 +96,7 @@ namespace Comgo.Infrastructure.Services
             }
         }
 
-        public async Task<InvoiceSettlementResponse> ListenForSettledInvoice(UserType userType)
+        public async Task<InvoiceSettlementResponse> ListenForSettledInvoice()
         {
             var settledInvoiceResponse = new InvoiceSettlementResponse();
             try
@@ -115,60 +104,29 @@ namespace Comgo.Infrastructure.Services
                 var helper = new LightningHelper(_config);
                 var txnReq = new InvoiceSubscription();
 
-                switch (userType)
+                var adminClient = helper.GetAdminClient();
+                var settledAdminInvoioce = adminClient.SubscribeInvoices(txnReq, new Metadata() { new Metadata.Entry("macaroon", helper.GetAdminMacaroon()) });
+                using (var call = settledAdminInvoioce)
                 {
-                    case UserType.User:
-                        var userClient = helper.GetUserClient();
-                        var settledInvoioce = userClient.SubscribeInvoices(txnReq, new Metadata() { new Metadata.Entry("macaroon", helper.GetUserMacaroon()) });
-                        using (var call = settledInvoioce)
+                    while (await call.ResponseStream.MoveNext())
+                    {
+                        var invoice = call.ResponseStream.Current;
+                        if (invoice.State == Invoice.Types.InvoiceState.Settled)
                         {
-                            var invoice = call.ResponseStream.Current;
-                            if (invoice.State == Invoice.Types.InvoiceState.Settled)
-                            {
-                                Console.WriteLine(invoice.ToString());
-                                var split = invoice.Memo.Split('/');
-                                settledInvoiceResponse.PaymentRequest = invoice.PaymentRequest;
-                                settledInvoiceResponse.IsKeysend = invoice.IsKeysend;
-                                settledInvoiceResponse.Value = invoice.Value;
-                                settledInvoiceResponse.Expiry = invoice.Expiry;
-                                settledInvoiceResponse.Settled = invoice.Settled;
-                                settledInvoiceResponse.SettledDate = invoice.SettleDate;
-                                settledInvoiceResponse.SettledIndex = (long)invoice.SettleIndex;
-                                settledInvoiceResponse.Private = invoice.Private;
-                                settledInvoiceResponse.AmountInSat = invoice.AmtPaidSat;
-                                settledInvoiceResponse.PostId = int.Parse(split[0]);
-                                settledInvoiceResponse.UserId = split[1];
-                                return settledInvoiceResponse;
-                            }
+                            Console.WriteLine(invoice.ToString());
+                            settledInvoiceResponse.PaymentRequest = invoice.PaymentRequest;
+                            settledInvoiceResponse.IsKeysend = invoice.IsKeysend;
+                            settledInvoiceResponse.Value = invoice.Value;
+                            settledInvoiceResponse.Expiry = invoice.Expiry;
+                            settledInvoiceResponse.Settled = invoice.Settled;
+                            settledInvoiceResponse.SettledDate = invoice.SettleDate;
+                            settledInvoiceResponse.SettledIndex = (long)invoice.SettleIndex;
+                            settledInvoiceResponse.Private = invoice.Private;
+                            settledInvoiceResponse.AmountInSat = invoice.AmtPaidSat;
+                            settledInvoiceResponse.Email = invoice.Memo;
+                            return settledInvoiceResponse;
                         }
-                        break;
-                    case UserType.Admin:
-                        var adminClient = helper.GetAdminClient();
-                        var settledAdminInvoioce = adminClient.SubscribeInvoices(txnReq, new Metadata() { new Metadata.Entry("macaroon", helper.GetAdminMacaroon()) });
-                        using (var call = settledAdminInvoioce)
-                        {
-                            var invoice = call.ResponseStream.Current;
-                            if (invoice.State == Invoice.Types.InvoiceState.Settled)
-                            {
-                                Console.WriteLine(invoice.ToString());
-                                var split = invoice.Memo.Split('/');
-                                settledInvoiceResponse.PaymentRequest = invoice.PaymentRequest;
-                                settledInvoiceResponse.IsKeysend = invoice.IsKeysend;
-                                settledInvoiceResponse.Value = invoice.Value;
-                                settledInvoiceResponse.Expiry = invoice.Expiry;
-                                settledInvoiceResponse.Settled = invoice.Settled;
-                                settledInvoiceResponse.SettledDate = invoice.SettleDate;
-                                settledInvoiceResponse.SettledIndex = (long)invoice.SettleIndex;
-                                settledInvoiceResponse.Private = invoice.Private;
-                                settledInvoiceResponse.AmountInSat = invoice.AmtPaidSat;
-                                settledInvoiceResponse.PostId = int.Parse(split[0]);
-                                settledInvoiceResponse.UserId = split[1];
-                                return settledInvoiceResponse;
-                            }
-                        }
-                        break;
-                    default:
-                        break;
+                    }
                 }
                 return settledInvoiceResponse;
             }

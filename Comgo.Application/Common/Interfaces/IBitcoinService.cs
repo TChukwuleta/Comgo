@@ -10,11 +10,9 @@ namespace Comgo.Application.Common.Interfaces
 {
     public interface IBitcoinService
     {
-        Task<string> GenerateAddress(string privkey, string userId);
-        Task<MultisigAddressCreationResponse> GenerateMultisigAddressBitcoinCore(string userpublickey, string adminpublickey, string methodname, int minimumKeys);
-        Task<Signature> GenerateSystemKey(string userId);
-        Task<string> GetRawTransactionBitcoinCore(string txnid);
-        Task<string> ConfirmUserTransaction(string privKey, string userId, string email);
-        Task<string> TestMultisig(string privKey, string userId, string email);
+        Task<(bool success, string message)> GenerateAddress(string userId);
+        Task<(bool success, string message)> CreateNewKeyPair(string userId);
+        Task<(bool success, string message)> ConfirmUserTransaction(string userId, string email);
+        Task<string> CreateMultisigTransaction(string userid, string recipient);
     }
 }
