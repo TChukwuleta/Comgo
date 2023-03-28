@@ -49,7 +49,7 @@ namespace Comgo.Application.Paystacks.Commands
             }
             catch (Exception ex)
             {
-                return Result.Failure(new string[] { "Service payment failed", ex?.Message ?? ex?.InnerException.Message });
+                return Result.Failure($"Service payment failed. {ex?.Message ?? ex?.InnerException.Message}");
             }
         }
     }

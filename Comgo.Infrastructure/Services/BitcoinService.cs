@@ -1,14 +1,16 @@
 ﻿using Comgo.Application.Common.Interfaces;
-using Comgo.Application.Common.Model.Response.BitcoinCommandResponses;
-using Comgo.Core.Entities;
+using Comgo.Application.Common.Model.Response;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using NBitcoin;
+using NBXplorer;
 using NBXplorer.DerivationStrategy;
 using Newtonsoft.Json;
 using QBitNinja.Client;
 using System;
 using System.IO;
+using System.Reflection.Metadata;
+using System.Text;
 
 namespace Comgo.Infrastructure.Services
 {
@@ -21,6 +23,7 @@ namespace Comgo.Infrastructure.Services
         private readonly IAuthService _authService;
         private readonly IBitcoinCoreClient _bitcoinCoreClient;
         private readonly Network _network;
+        private readonly ChainName _chainNetwork;
         public BitcoinService(IConfiguration config, IEmailService emailService, IAppDbContext context, 
             IEncryptionService encryptionService, IAuthService authService, IBitcoinCoreClient bitcoinCoreClient)
         {
@@ -31,6 +34,7 @@ namespace Comgo.Infrastructure.Services
             _emailService = emailService;
             _context = context;
             _network = Network.RegTest;
+            _chainNetwork = ChainName.Regtest;
         }
 
         public async Task<(bool success, string message)> ConfirmUserTransaction(string userId, string email)
@@ -39,32 +43,21 @@ namespace Comgo.Infrastructure.Services
             {
                 var user = await _authService.GetUserById(userId);
                 var userSigExist = await _authService.GetSuperAdmin(userId);
-                if (string.IsNullOrEmpty(userSigExist.user.Key))
+
+                var userKey = await _context.Signatures.FirstOrDefaultAsync(c => c.UserId == userId);
+                if (userKey == null)
                 {
-                    var userCustody = await _context.UserCustodies.FirstOrDefaultAsync(c => c.UserId == userId);
-                    if (userCustody == null)
-                    {
-                        var newKey = new Key();
-                        var serializedKey = JsonConvert.SerializeObject(newKey);
-                        var encryptedKey = _encryptionService.EncryptData(serializedKey);
-                        var newCustody = new UserCustody
-                        {
-                            CreatedDate = DateTime.Now,
-                            Status = Core.Enums.Status.Active,
-                            UserId = userId,
-                            Key = encryptedKey
-                        };
-                        await _context.UserCustodies.AddAsync(newCustody);
-                        await _context.SaveChangesAsync(new CancellationToken());
-                    }
+                    return (false, "No user key record found. Please contact support");
                 }
+
                 var generateOtp = await _authService.GenerateOTP(email, "confirm-transaction");
                 var errorMessage = generateOtp.Message != null ? generateOtp.Message : generateOtp.Messages.FirstOrDefault();
                 if (!generateOtp.Succeeded)
                 {
                     throw new ArgumentException(errorMessage);
                 }
-                var sendEmail = await _emailService.SendEmailMessage(generateOtp.Entity.ToString(), "Transaction confirmation", user.user.Email);
+                //var sendEmail = await _emailService.SendEmailMessage(generateOtp.Entity.ToString(), "Transaction confirmation", user.user.Email);
+                var sendEmail = await _emailService.SendRegistrationEmailToUser(email, generateOtp.Entity.ToString());
                 if (!sendEmail)
                 {
                     throw new ArgumentException("An error occured while trying to confirm your transaction");
@@ -78,34 +71,82 @@ namespace Comgo.Infrastructure.Services
             }
         }
 
-        public async Task<(bool success, string message)> GenerateAddress(string userId)
+
+        public async Task<(bool success, string message, KeyPairResponse entity)> CreateNewKeyPair(string userId)
         {
             try
             {
                 var user = await _authService.GetUserById(userId);
-                var adminUser = await _authService.GetSuperAdmin(userId);
-                if (string.IsNullOrEmpty(adminUser.user.Key))
+                var superAdmin = await _authService.GetSuperAdmin(userId);
+
+                var userKey = new Key();
+                var userKeySecret = userKey.GetBitcoinSecret(_network).ToWif();
+                var userPubKey = userKey.PubKey.ToBytes();
+                var userPublicKey = Encoding.UTF8.GetString(userPubKey);
+
+                var systemKey = new Key();
+                var systemKeySecret = systemKey.GetBitcoinSecret(_network).ToWif();
+                var systemPubKey = systemKey.PubKey.ToBytes();
+                var systemPublicKey = Encoding.UTF8.GetString(systemPubKey);
+
+
+                var existingSignature = superAdmin.user.Signatures.FirstOrDefault(c => c.UserId == userId);
+                if (existingSignature == null)
                 {
-                    return (false, "An error occured while trying to generate address. Please contact admin");
+                    existingSignature.AdminUserId = superAdmin.user.UserId;
+                    existingSignature.SystemKey = _encryptionService.EncryptData(systemKeySecret);
+                    existingSignature.SystemPubKey = _encryptionService.EncryptData(systemPublicKey);
+                    existingSignature.UserPubKey = _encryptionService.EncryptData(userPublicKey);
+                    existingSignature.CreatedDate = DateTime.Now;
+                    existingSignature.Status = Core.Enums.Status.Active;
+                    existingSignature.UserId = userId;
+                    await _context.Signatures.AddAsync(existingSignature);
                 }
+                else
+                {
+                    existingSignature.AdminUserId = superAdmin.user.UserId;
+                    existingSignature.SystemKey = _encryptionService.EncryptData(systemKeySecret);
+                    existingSignature.SystemPubKey = _encryptionService.EncryptData(systemPublicKey);
+                    existingSignature.UserPubKey = _encryptionService.EncryptData(userPublicKey);
+                    _context.Signatures.Update(existingSignature);
+                }
+                await _context.SaveChangesAsync(new CancellationToken());
 
-                var decryptedUserKey = _encryptionService.DecryptData(user.user.Key);
-                var decryptedAdminKey = _encryptionService.DecryptData(adminUser.user.Key);
+                var keyPairs = new KeyPairResponse
+                {
+                    PublicKey = userPublicKey,
+                    PrivateKey = userKeySecret
+                };
+                return (true, "User keys created successfully", keyPairs);
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
 
-                var userKey = JsonConvert.DeserializeObject<Key>(decryptedUserKey);
-                var adminKey = JsonConvert.DeserializeObject<Key>(decryptedAdminKey);
+        public async Task<(bool success, string message)> GenerateAddress(string userId)
+        {
+            try
+            {
+                var userPair = await _context.Signatures.FirstOrDefaultAsync(c => c.UserId == userId);
+                if (userPair == null)
+                {
+                    return (false, "An error occured while retrieving user key details. Kindly contact support");
+                }
+                var userPubKey = _encryptionService.DecryptData(userPair.UserPubKey);
+                var systemPubKey = _encryptionService.DecryptData(userPair.SystemPubKey);
 
-                var userKeySecret = userKey.GetBitcoinSecret(_network);
-                var adminKeySecret = adminKey.GetBitcoinSecret(_network);
-
+                var userPublicKey = new PubKey(Encoding.ASCII.GetBytes(userPubKey));
+                var adminPublicKey = new PubKey(Encoding.ASCII.GetBytes(systemPubKey));
                 // Generate p2sh 2 of 2 multisig address
                 var redeemScript = PayToMultiSigTemplate
                     .Instance
-                    .GenerateScriptPubKey(2, new[] { userKeySecret.PubKey, adminKeySecret.PubKey })
+                    .GenerateScriptPubKey(2, new[] { userPublicKey, adminPublicKey })
                     .PaymentScript;
 
                 var address = redeemScript.Hash.GetAddress(_network);
-                return (true, JsonConvert.SerializeObject(address));
+                return (true, JsonConvert.SerializeObject(address.ToString()));
             }
             catch (Exception ex)
             {
@@ -114,48 +155,39 @@ namespace Comgo.Infrastructure.Services
             }
         }
 
-        public async Task<string> CreateMultisigTransaction(string userid, string recipient)
+
+        public async Task<(bool success, string message)> CreateMultisigTransaction(string userid, string recipient)
         {
+            var client = new QBitNinjaClient(_network);
             try
             {
-                var adminUser = await _authService.GetSuperAdmin(userid);
-                var user = await _authService.GetUserById(userid);
-
-                var decryptedUserKey = _encryptionService.DecryptData(user.user.Key);
-                if (string.IsNullOrEmpty(decryptedUserKey))
+                // Get public key for both user and admin
+                var userPair = await _context.Signatures.FirstOrDefaultAsync(c => c.UserId == userid);
+                if (userPair == null)
                 {
-                    return "failed";
+                    return (false, "An error occured while retrieving user key details. Kindly contact support");
                 }
+                var decryptedUserPubKey = _encryptionService.DecryptData(userPair.UserPubKey);
+                var decryptedAdminPubKey = _encryptionService.DecryptData(userPair.SystemPubKey);
+                var userPublicKey = new PubKey(Encoding.ASCII.GetBytes(decryptedUserPubKey));
+                var systemPublicKey = new PubKey(Encoding.ASCII.GetBytes(decryptedAdminPubKey));
 
-                var decryptedAdminKey = _encryptionService.DecryptData(adminUser.user.Key);
-                if (string.IsNullOrEmpty(decryptedAdminKey))
-                {
-                    return "failed";
-                }
-
-                var userPublicKey = JsonConvert.DeserializeObject<PubKey>(decryptedUserKey);
-                var adminPublicKey = JsonConvert.DeserializeObject<PubKey>(decryptedAdminKey);
-
+                // Get the redeem script and addresses
                 var scriptPubKey = PayToMultiSigTemplate
                     .Instance
-                    .GenerateScriptPubKey(2, new[] { userPublicKey, adminPublicKey });
-
+                    .GenerateScriptPubKey(2, new[] { userPublicKey, systemPublicKey });
                 Console.Write("Public script: " + scriptPubKey);
+                Console.Write("Redeem script: " + scriptPubKey.PaymentScript);
 
-                var redeemScript = PayToMultiSigTemplate
-                    .Instance
-                    .GenerateScriptPubKey(2, new[] { userPublicKey, adminPublicKey })
-                    .PaymentScript;
+                var lucasAddress = BitcoinAddress.Create(recipient, _network);
+                var changeAddress = scriptPubKey.PaymentScript.Hash.GetAddress(_network);
 
-                Console.Write("Redeem script: " + redeemScript);
 
-                /*var address = redeemScript.Hash.GetAddress(network);
-                return JsonConvert.SerializeObject(address);*/
-                var client = new QBitNinjaClient(_network);
-                var receivedTransactionId = uint256.Parse("0acb6e97b228b838049ffbd528571c5e3edd003f0ca8ef61940166dc3081b78a");
-                var receiveTransactionResponse = client.GetTransaction(receivedTransactionId).Result;
-
-                // Select which output of transaction should be spent
+                var receiveTransactionId = uint256.Parse("0acb6e97b228b838049ffbd528571c5e3edd003f0ca8ef61940166dc3081b78a");
+                var receiveTransactionResponse = client.GetTransaction(receiveTransactionId).Result;
+                Console.WriteLine(receiveTransactionResponse.TransactionId);
+                // if this fails, it's ok. It hasn't been confirmed in a block yet. Proceed
+                Console.WriteLine(receiveTransactionResponse.Block.Confirmations);
                 var receivedCoins = receiveTransactionResponse.ReceivedCoins;
                 OutPoint outpointToSpend = null;
                 ScriptCoin coinToSpend = null;
@@ -163,69 +195,30 @@ namespace Comgo.Infrastructure.Services
                 {
                     try
                     {
-                        coinToSpend = new ScriptCoin(c, redeemScript);
+                        // If we can make a ScriptCoin out of our redeemScript
+                        // we "own" this outpoint
+                        coinToSpend = new ScriptCoin(c, scriptPubKey.PaymentScript);
                         outpointToSpend = c.Outpoint;
                     }
-                    catch
-                    {
-                    }
+                    catch { }
                 }
-
                 if (outpointToSpend == null)
-                {
-                    throw new Exception("Txout doesnt contain any our scriptpubkey");
-                }
-
+                    throw new Exception("TxOut doesn't contain any our ScriptPubKey");
                 Console.WriteLine("We want to spend outpoint #{0}", outpointToSpend.N + 1);
-
-                var userKey = new Key();
-                var userKeyWif = userKey.GetBitcoinSecret(_network);
-
-                var adminKey = new Key();
-                var adminKeyWif = adminKey.GetBitcoinSecret(_network);
-
-                var recipientAddress = BitcoinAddress.Create(recipient, _network);
-                TransactionBuilder builder = _network.CreateTransactionBuilder();
                 var minerFee = new Money(0.0002m, MoneyUnit.BTC);
                 var txInAmount = (Money)receivedCoins[(int)outpointToSpend.N].Amount;
                 var sendAmount = txInAmount - minerFee;
 
-                NBitcoin.Transaction unsigned = builder
-                    .AddCoins(coinToSpend)
-                    .Send(recipientAddress, sendAmount)
-                    .SendFees(minerFee)
-                    .SetChange(redeemScript.Hash.GetAddress(_network))
-                    .BuildTransaction(sign: false);
+                // Sign transactions with pub key
+               var signedTransaction =  await SignSignature(lucasAddress, sendAmount, coinToSpend, minerFee, changeAddress, userPublicKey, systemPublicKey);
 
-                NBitcoin.Transaction userSigned = builder
-                    .AddCoins(coinToSpend)
-                    .AddKeys(userKeyWif)
-                    .SignTransaction(unsigned);
-
-                NBitcoin.Transaction adminSigns = builder
-                    .AddCoins(coinToSpend)
-                    .AddKeys(adminKeyWif)
-                    .SignTransaction(userSigned);
-
-                NBitcoin.Transaction fullySigned = builder
-                    .AddCoins(coinToSpend)
-                    .CombineSignatures(userSigned, adminSigns);
-
-                Console.WriteLine(fullySigned);
-
-                var broadcastResponse = client.Broadcast(fullySigned).Result;
+                // Broadcast signed transactions
+                var broadcastResponse = client.Broadcast(signedTransaction).Result;
                 if (!broadcastResponse.Success)
                 {
-                    Console.Error.WriteLine("ErrorCode: " + broadcastResponse.Error.ErrorCode);
-                    Console.Error.WriteLine("Error message: " + broadcastResponse.Error.Reason);
+                    throw new ArgumentException($"Threw error with code: {broadcastResponse.Error.ErrorCode}, and message: {broadcastResponse.Error.Reason}");
                 }
-                else
-                {
-                    Console.WriteLine("Success! You can check out the hash of the transaciton in any block explorer:");
-                    Console.WriteLine(fullySigned.GetHash());
-                }
-
-                return "done";
+                return (true, $"Success! You can check out the hash of the transaciton in any block explorer: {signedTransaction.GetHash().ToString()}");
             }
             catch (Exception ex)
             {
@@ -234,33 +227,38 @@ namespace Comgo.Infrastructure.Services
             }
         }
 
-        public async Task<(bool success, string message)> CreateNewKeyPair(string userId)
+        public async Task<Transaction> SignSignature(BitcoinAddress recipientAddress, Money amount, ScriptCoin coin, Money minerFee, BitcoinAddress changeAddress, PubKey userKey, PubKey systemKey)
         {
+            var builder = _network.CreateTransactionBuilder();
             try
             {
-                var userKey = new Key();
-                var userKeySecret = userKey.GetBitcoinSecret(_network).ToWif();
-                var encryptedUserKey = _encryptionService.EncryptData(userKeySecret);
-                var user = await _authService.GetUserById(userId);
-                user.user.Key = encryptedUserKey;
-                var updatedUser = await _authService.UpdateUserAsync(user.user);
-                if (!updatedUser.Succeeded)
+                var unsignedTransaction = builder
+                    .AddCoin(coin)
+                    .Send(recipientAddress, amount)
+                    .SendFees(minerFee)
+                    .SetChange(changeAddress)
+                    .BuildTransaction(sign: false);
+
+                var systemSignature = builder
+                    .AddCoin(coin)
+                    .AddKeys((ISecret)systemKey)
+                    .SignTransaction(unsignedTransaction);
+
+                var userSignature = builder
+                    .AddCoin(coin)
+                    .AddKeys((ISecret)userKey)
+                    .SignTransaction(systemSignature);
+
+                var fullySignedTransaction = builder
+                    .AddCoins(coin)
+                    .CombineSignatures(systemSignature, userSignature);
+
+                Console.WriteLine(fullySignedTransaction);
+                if (fullySignedTransaction == null)
                 {
-                    return (false, "An error occured. Please try again later");
+                    throw new ArgumentException("An error occured while trying to sign transactions.");
                 }
-                var adminKey = new Key();
-                var adminKeySecret = adminKey.GetBitcoinSecret(_network).ToWif();
-                var encryptedAdminKey =  _encryptionService.EncryptData(adminKeySecret);
-                var newCustody = new UserCustody
-                {
-                    UserId = userId,
-                    Key = encryptedAdminKey,
-                    CreatedDate = DateTime.Now,
-                    Status = Core.Enums.Status.Active
-                };
-                await _context.UserCustodies.AddAsync(newCustody);
-                await _context.SaveChangesAsync(new CancellationToken());
-                return (true, "User custody created successfully");
+                return fullySignedTransaction;
             }
             catch (Exception ex)
             {

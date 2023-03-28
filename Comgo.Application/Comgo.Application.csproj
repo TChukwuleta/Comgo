@@ -9,6 +9,7 @@
   <ItemGroup>
     <PackageReference Include="FluentValidation" Version="11.5.1" />
     <PackageReference Include="MediatR" Version="11.1.0" />
+    <PackageReference Include="MimeKit" Version="3.5.0" />
     <PackageReference Include="NBitcoin" Version="7.0.24" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.2" />
   </ItemGroup>
@@ -18,6 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Folder Include="BitcoinMethods\Queries\" />
     <Folder Include="Lightnings\Queries\" />
     <Folder Include="Paystacks\Queries\" />
     <Folder Include="Signatures\Queries\" />

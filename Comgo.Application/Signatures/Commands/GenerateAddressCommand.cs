@@ -12,7 +12,6 @@ namespace Comgo.Application.Signatures.Commands
 {
     public class GenerateAddressCommand : IRequest<Result>, IBaseValidator
     {
-        public string PublicKey { get; set; }
         public string UserId { get; set; }
     }
 
@@ -20,9 +19,30 @@ namespace Comgo.Application.Signatures.Commands
     {
         private readonly IAppDbContext _context;
         private readonly IAuthService _authService;
-        public Task<Result> Handle(GenerateAddressCommand request, CancellationToken cancellationToken)
+        private readonly IBitcoinService _bitcoinService;
+        public GenerateAddressCommandHandler(IAppDbContext context, IAuthService authService, IBitcoinService bitcoinService)
         {
-            throw new NotImplementedException();
+            _context = context;
+            _authService = authService;
+            _bitcoinService = bitcoinService;
+        }
+
+        public async Task<Result> Handle(GenerateAddressCommand request, CancellationToken cancellationToken)
+        {
+            try
+            {
+                var user = await _authService.GetUserById(request.UserId);
+                if (user.user == null)
+                {
+                    return Result.Failure("Unable to generate new address. Invalid user details");
+                }
+                return Result.Success("Tru");
+            }
+            catch (Exception ex)
+            {
+
+                throw ex;
+            }
         }
     }
 }

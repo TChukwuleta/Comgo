@@ -90,5 +90,20 @@ namespace Comgo.Api.Controllers
                 return Result.Failure(new string[] { "Retrieval was not successful" + ex?.Message ?? ex?.InnerException?.Message });
             }
         }
+
+        [HttpGet("getuseraccesslevel")]
+        public async Task<ActionResult<Result>> GetUserAccessLevel()
+        {
+            try
+            {
+                return await Task.Run(() => Result.Success(
+                  ((UserAccessLevel[])Enum.GetValues(typeof(UserAccessLevel))).Select(x => new { Value = (int)x, Name = x.ToString() }).ToList()
+                  ));
+            }
+            catch (System.Exception ex)
+            {
+                return Result.Failure(new string[] { "Retrieval was not successful" + ex?.Message ?? ex?.InnerException?.Message });
+            }
+        }
     }
 }

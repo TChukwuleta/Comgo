@@ -36,7 +36,7 @@ namespace Comgo.Application.Users.Queries
             }
             catch (Exception ex)
             {
-                return Result.Failure(new string[] { "Getting user by Id was not successful", ex?.Message ?? ex?.InnerException.Message });
+                return Result.Failure($"Getting user by Id was not successful. {ex?.Message ?? ex?.InnerException.Message}");
             }
         }
     }

@@ -43,7 +43,7 @@ namespace Comgo.Application.Users.Commands
             }
             catch (Exception ex)
             {
-                return Result.Failure("User creation failed", ex?.Message ?? ex?.InnerException.Message);
+                return Result.Failure($"User creation failed. {ex?.Message ?? ex?.InnerException.Message}");
             }
         }
     }

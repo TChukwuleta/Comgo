@@ -10,7 +10,8 @@ namespace Comgo.Core.Entities
     {
         public string AdminUserId { get; set; }
         public string SystemKey { get; set; }
-        public string UserKey { get; set; }
+        public string SystemPubKey { get; set; }
+        public string UserPubKey { get; set; }
         public string UserId { get; set; }
     }
 }

@@ -54,7 +54,6 @@ namespace Comgo.Application.Users.Commands
                     Email = request.Email,
                     Password = request.Password,
                     UserType = Core.Enums.UserType.User
-
                 };
                 var result = await _authService.CreateUserAsync(newUser);
                 var error = string.IsNullOrEmpty(result.result.Message) ? result.result.Messages.FirstOrDefault() : result.result.Message;
@@ -67,7 +66,8 @@ namespace Comgo.Application.Users.Commands
                 {
                     return Result.Failure("An error occured when generating otp");
                 }
-                var sendEmail = await _emailService.SendEmailMessage(generateOtp.Entity.ToString(), "New User Regstration", request.Email);
+                //var sendEmail = await _emailService.SendEmailMessage(generateOtp.Entity.ToString(), "New User Regstration", request.Email);
+                var sendEmail = await _emailService.SendRegistrationEmailToUser(request.Email, generateOtp.Entity.ToString());
                 if (!sendEmail)
                 {
                     return Result.Failure("An error occured while sending email");
@@ -76,7 +76,7 @@ namespace Comgo.Application.Users.Commands
             }
             catch (Exception ex)
             {
-                return Result.Failure("User creation failed", ex?.Message ?? ex?.InnerException.Message);
+                return Result.Failure($"User creation failed. {ex?.Message ?? ex?.InnerException.Message}");
             }
         }
     }

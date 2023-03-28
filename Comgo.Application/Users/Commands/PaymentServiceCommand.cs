@@ -45,10 +45,15 @@ namespace Comgo.Application.Users.Commands
                 {
                     return Result.Failure("Unable to make payment. Invalid user details");
                 }
+
+                if (!user.user.EmailConfirmed)
+                {
+                    return Result.Failure("Kindly confirm verify your account before you proceed to make payment");
+                }
                 switch (request.PaymentModeType)
                 {
                     case PaymentModeType.Bitcoin:
-                        return Result.Failure("Coming soon. Kindly choose other form of payment");
+                        return Result.Success("Coming soon. Kindly choose other form of payment");
                     case PaymentModeType.Lightning:
                         var generateLightning = await _lightningService.CreateInvoice(lightningFees, request.Email);
                         if (string.IsNullOrEmpty(generateLightning))
@@ -67,15 +72,14 @@ namespace Comgo.Application.Users.Commands
                         };
                         var paystackInitialtion = await _paystackService.MakePayment(paystackRequest);
                         return Result.Success("Paystack initiation was successful", paystackInitialtion);
-                        break;
                     default:
-                        break;
+                        return Result.Failure("Invalid payment mode type selected");
                 }
                 return Result.Success("done");
             }
             catch (Exception ex)
             {
-                return Result.Failure(new string[] { "Service payment failed", ex?.Message ?? ex?.InnerException.Message });
+                return Result.Failure($"Service payment failed. {ex?.Message ?? ex?.InnerException.Message}");
             }
         }
     }

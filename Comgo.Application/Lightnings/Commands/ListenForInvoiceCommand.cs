@@ -53,7 +53,7 @@ namespace Comgo.Application.Lightnings.Commands
             }
             catch (Exception ex)
             {
-                return Result.Failure(new string[] { "Invoice confirmation was not successful", ex?.Message ?? ex?.InnerException.Message });
+                return Result.Failure($"Invoice confirmation was not successful. {ex?.Message ?? ex?.InnerException.Message}");
             }
         }
     }

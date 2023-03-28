@@ -192,7 +192,7 @@ namespace Comgo.Infrastructure.Services
         {
             try
             {
-                var superAdmin = await _userManager.Users.Include(c => c.UserCustodies).FirstOrDefaultAsync(c => c.UserType == UserType.SuperAdmin);
+                var superAdmin = await _userManager.Users.Include(c => c.Signatures).FirstOrDefaultAsync(c => c.UserType == UserType.SuperAdmin);
                 if (superAdmin == null)
                 {
                     return (Result.Failure("Super admin user does not exist"), null);
@@ -204,16 +204,8 @@ namespace Comgo.Infrastructure.Services
                     Email = superAdmin.UserName,
                     UserId = superAdmin.Id,
                     Status = superAdmin.Status,
+                    Signatures = (List<Signature>)superAdmin.Signatures
                 };
-
-                if (!string.IsNullOrEmpty(userid))
-                {
-                    var userMatch = superAdmin.UserCustodies.FirstOrDefault(c => c.UserId == userid);
-                    if (userMatch != null)
-                    {
-                        user.Key = userMatch.Key;
-                    }
-                }
                 return (Result.Success("Super admin user details retrieval was successful"), user);
             }
             catch (Exception ex)
@@ -238,6 +230,7 @@ namespace Comgo.Infrastructure.Services
                     Email = existingUser.UserName,
                     UserId = existingUser.Id,
                     Status = existingUser.Status,
+                    EmailConfirmed = existingUser.EmailConfirmed
                 };
                 return (Result.Success("User details retrieval was successful"), user);
             }
@@ -262,7 +255,7 @@ namespace Comgo.Infrastructure.Services
                     Name = existingUser.Name,
                     Email = existingUser.UserName,
                     UserId = existingUser.Id,
-                    Status = existingUser.Status,
+                    Status = existingUser.Status
                 };
                 return (Result.Success("User details retrieval was successful"), user);
             }
@@ -286,6 +279,10 @@ namespace Comgo.Infrastructure.Services
                 if (!checkPassword)
                 {
                     return Result.Failure("Invalid email or password specified");
+                }
+                if (!user.HasPaid)
+                {
+                    return Result.Failure("Cannot login. User has not subscribed to our service");
                 }
                 if (user.Status != Status.Active)
                 {
@@ -363,7 +360,7 @@ namespace Comgo.Infrastructure.Services
                     return Result.Failure("Invalid user details specified");
                 }
                 existingUser.HasPaid = paid;
-                if (paid)
+                if (paid == true)
                 {
                     existingUser.Status = Status.Active;
                 }
@@ -412,7 +409,7 @@ namespace Comgo.Infrastructure.Services
                 Subject = new ClaimsIdentity(new[]
                 {
                     new Claim(JwtRegisteredClaimNames.Email, email),
-                    new Claim("userId", UserId),
+                    new Claim("userid", UserId),
                     new Claim(JwtRegisteredClaimNames.Sub, email),
                     new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
                 }),

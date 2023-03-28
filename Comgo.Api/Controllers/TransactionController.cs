@@ -1,6 +1,7 @@
 ﻿using Comgo.Application.Transactions.Commands;
 using Comgo.Application.Transactions.Queries;
 using Comgo.Core.Model;
+using Comgo.Infrastructure.Utility;
 using MediatR;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -11,13 +12,14 @@ namespace Comgo.Api.Controllers
     [ApiController]
     public class TransactionController : ApiController
     {
+        private readonly IMediator _mediator;
         protected readonly IHttpContextAccessor _contextAccessor;
-        private readonly string accessToken;
-        public TransactionController(IHttpContextAccessor contextAccessor)
+        public TransactionController(IHttpContextAccessor contextAccessor, IMediator mediator)
         {
+            _mediator = mediator;
             _contextAccessor = contextAccessor;
-            accessToken = _contextAccessor.HttpContext.Request.Headers["Authorization"].ToString();
-            if (string.IsNullOrEmpty(accessToken))
+            accessToken = _contextAccessor.HttpContext.Request.Headers["Authorization"].ToString()?.ExtractToken();
+            if (accessToken == null)
             {
                 throw new Exception("You are not authorized!");
             }
@@ -28,7 +30,7 @@ namespace Comgo.Api.Controllers
         {
             try
             {
-                return await Mediator.Send(command);
+                return await _mediator.Send(command);
             }
             catch (Exception ex)
             {
@@ -42,7 +44,7 @@ namespace Comgo.Api.Controllers
         {
             try
             {
-                return await Mediator.Send(new GetAllTransactionsQuery { Skip = skip, Take = take, UserId = userid });
+                return await _mediator.Send(new GetAllTransactionsQuery { Skip = skip, Take = take, UserId = userid });
             }
             catch (Exception ex)
             {
@@ -56,7 +58,7 @@ namespace Comgo.Api.Controllers
         {
             try
             {
-                return await Mediator.Send(new GetTransactionByIdQuery { Id = id, UserId = userid });
+                return await _mediator.Send(new GetTransactionByIdQuery { Id = id, UserId = userid });
             }
             catch (Exception ex)
             {
@@ -70,7 +72,7 @@ namespace Comgo.Api.Controllers
         {
             try
             {
-                return await Mediator.Send(new GetTransactionByReferenceQuery { Reference = txnref, UserId = userid });
+                return await _mediator.Send(new GetTransactionByReferenceQuery { Reference = txnref, UserId = userid });
             }
             catch (Exception ex)
             {
@@ -84,7 +86,7 @@ namespace Comgo.Api.Controllers
         {
             try
             {
-                return await Mediator.Send(new GetCreditTransactionByUserIdQuery { UserId = userid, Skip = skip, Take = take });
+                return await _mediator.Send(new GetCreditTransactionByUserIdQuery { UserId = userid, Skip = skip, Take = take });
             }
             catch (Exception ex)
             {
@@ -98,7 +100,7 @@ namespace Comgo.Api.Controllers
         {
             try
             {
-                return await Mediator.Send(new GetDebitTransactionByUserIdQuery { UserId = userid, Skip = skip, Take = take });
+                return await _mediator.Send(new GetDebitTransactionByUserIdQuery { UserId = userid, Skip = skip, Take = take });
             }
             catch (Exception ex)
             {

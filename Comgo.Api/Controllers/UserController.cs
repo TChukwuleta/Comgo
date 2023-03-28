@@ -1,124 +1,37 @@
-﻿using Comgo.Application.BitcoinMethods.LoadWallet;
-using Comgo.Application.Lightnings.Commands;
-using Comgo.Application.Paystacks.Commands;
-using Comgo.Application.Users.Commands;
-using Comgo.Application.Users.Queries;
+﻿using Comgo.Application.Users.Queries;
 using Comgo.Core.Model;
+using Comgo.Infrastructure.Utility;
 using MediatR;
-using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Comgo.Api.Controllers
 {
-    [Route("api/[controller]")]
-    [ApiController]
-    public class UserController : ControllerBase
+    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+    public class UserController : ApiController
     {
         private readonly IMediator _mediator;
-
-        public UserController(IMediator mediator)
+        protected readonly IHttpContextAccessor _contextAccessor;
+        public UserController(IMediator mediator, IHttpContextAccessor contextAccessor)
         {
             _mediator = mediator;
-        }
-
-
-        [HttpPost("testbitcoin")]
-        public async Task<ActionResult<Result>> TestBitcoinWallet(LoadWalletCommand command)
-        {
-            try
+            _contextAccessor = contextAccessor;
+            accessToken = _contextAccessor.HttpContext.Request.Headers["Authorization"].ToString()?.ExtractToken();
+            if (accessToken == null)
             {
-                return await _mediator.Send(command);
-            }
-            catch (Exception ex)
-            {
-                return Result.Failure($"Bitcoin tests was not successful. Error: {ex?.Message ?? ex?.InnerException?.Message}");
+                throw new Exception("You are not authorized!");
             }
         }
 
-        
-        [HttpPost("create")]
-        public async Task<ActionResult<Result>> CreateUser(CreateUserCommand command)
-        {
-            try
-            {
-                return await _mediator.Send(command);
-            }
-            catch (Exception ex)
-            {
-                return Result.Failure($"User creation was not successful. Error: {ex?.Message ?? ex?.InnerException?.Message}");
-            }
-        }
 
-        [HttpPost("emailverification")]
-        public async Task<ActionResult<Result>> EmailVerification(EmailVerificationCommand command)
-        {
-            try
-            {
-                return await _mediator.Send(command);
-            }
-            catch (Exception ex)
-            {
-                return Result.Failure($"User verification was not successful. Error: {ex?.Message ?? ex?.InnerException?.Message}");
-            }
-        }
-
-        [HttpPost("servicepayment")]
-        public async Task<ActionResult<Result>> ServicePayment(PaymentServiceCommand command)
-        {
-            try
-            {
-                return await _mediator.Send(command);
-            }
-            catch (Exception ex)
-            {
-                return Result.Failure($"Service payment was not successful. Error: {ex?.Message ?? ex?.InnerException?.Message}");
-            }
-        }
-
-        [HttpPost("verifypaystackpayment")]
-        public async Task<ActionResult<Result>> VerifyPaystackPayment(VerifyPaystackCommand command)
-        {
-            try
-            {
-                return await _mediator.Send(command);
-            }
-            catch (Exception ex)
-            {
-                return Result.Failure($"Payment verification was not successful. Error: {ex?.Message ?? ex?.InnerException?.Message}");
-            }
-        }
-
-        [HttpPost("listenforpayment")]
-        public async Task<ActionResult<Result>> ListenForPayment(ListenForInvoiceCommand command)
-        {
-            try
-            {
-                return await _mediator.Send(command);
-            }
-            catch (Exception ex)
-            {
-                return Result.Failure($"Payment verification was not successful. Error: {ex?.Message ?? ex?.InnerException?.Message}");
-            }
-        }
-
-        [HttpPost("login")]
-        public async Task<ActionResult<Result>> Login(UserLoginCommand command)
-        {
-            try
-            {
-                return await _mediator.Send(command);
-            }
-            catch (Exception ex)
-            {
-                return Result.Failure($"User login was not successful. Error: {ex?.Message ?? ex?.InnerException?.Message}");
-            }
-        }
 
         [HttpGet("getusersbyid/{userId}")]
         public async Task<ActionResult<Result>> GetUserByRoleId(string userId)
         {
             try
             {
+                accessToken.ValidateToken(userId);
                 return await _mediator.Send(new GetUserByIdQuery
                 {
                     UserId = userId
@@ -149,3 +62,7 @@ namespace Comgo.Api.Controllers
         }
     }
 }
+
+
+/*command.AccessToken = accessToken.RawData;
+accessToken.ValidateToken(command.UserId);*/
