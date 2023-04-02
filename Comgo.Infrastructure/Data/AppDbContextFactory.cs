@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace Comgo.Infrastructure.Data
 {
-    public class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbContext>
+    /*public class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbContext>
     {
         private readonly IConfiguration _config;
         public AppDbContextFactory(IConfiguration config)
@@ -23,5 +23,5 @@ namespace Comgo.Infrastructure.Data
 
             return new AppDbContext(optionsBuilder.Options);
         }
-    }
+    }*/
 }

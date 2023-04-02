@@ -44,7 +44,7 @@ namespace Comgo.Application.Paystacks.Commands
                     return Result.Failure(verifyPaymentResponse);
                 }
 
-                var createCustody = await _bitcoinService.CreateNewKeyPair(user.user.UserId);
+                //var createCustody = await _bitcoinService.CreateNewKeyPair(user.user.UserId);
                 return Result.Success("Payment verification was successful. User can now proceed with this application");
             }
             catch (Exception ex)

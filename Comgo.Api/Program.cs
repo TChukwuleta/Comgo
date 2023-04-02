@@ -87,9 +87,10 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddIdentity<AppUser, IdentityRole>(options => options.SignIn.RequireConfirmedAccount = true)
     .AddEntityFrameworkStores<AppDbContext>().AddDefaultTokenProviders();
 
+
 builder.Services.Configure<DataProtectionTokenProviderOptions>(opts => opts.TokenLifespan = TimeSpan.FromHours(10));
 
-builder.Services.AddScoped<IAppDbContext>(prov => prov.GetService<AppDbContext>());
+builder.Services.AddScoped<IAppDbContext, AppDbContext>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddTransient<IEncryptionService, EncryptionService>();
 builder.Services.AddTransient<ICloudinaryService, CloudinaryService>();
@@ -98,6 +99,11 @@ builder.Services.AddTransient<ILightningService, LightningService>();
 builder.Services.AddTransient<IBitcoinService, BitcoinService>();
 builder.Services.AddTransient<IPaystackService, PaystackService>();
 builder.Services.AddTransient<IBitcoinCoreClient, BitcoinCoreClient>();
+
+var emailConfig = builder.Configuration
+        .GetSection("EmailConfiguration")
+        .Get<EmailConfiguration>();
+builder.Services.AddSingleton(emailConfig);
 
 
 

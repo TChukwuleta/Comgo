@@ -1,4 +1,5 @@
 ﻿using Comgo.Application.Common.Interfaces;
+using Comgo.Application.Common.Model;
 using Comgo.Core.Entities;
 using Comgo.Core.Enums;
 using Comgo.Core.Model;
@@ -204,7 +205,7 @@ namespace Comgo.Infrastructure.Services
                     Email = superAdmin.UserName,
                     UserId = superAdmin.Id,
                     Status = superAdmin.Status,
-                    Signatures = (List<Signature>)superAdmin.Signatures
+                    UserCount = superAdmin.UserCount
                 };
                 return (Result.Success("Super admin user details retrieval was successful"), user);
             }
@@ -266,30 +267,35 @@ namespace Comgo.Infrastructure.Services
             }
         }
 
-        public async Task<Result> Login(string email, string password)
+        public async Task<UserLogin> Login(string email, string password)
         {
             try
             {
                 var user = await _userManager.FindByNameAsync(email);
                 if (user == null)
                 {
-                    return Result.Failure("Invalid email or password specified");
+                    throw new ArgumentException("Invalid email or password specified");
                 }
                 var checkPassword = await _userManager.CheckPasswordAsync(user, password);
                 if (!checkPassword)
                 {
-                    return Result.Failure("Invalid email or password specified");
+                    throw new ArgumentException("Invalid email or password specified");
                 }
                 if (!user.HasPaid)
                 {
-                    return Result.Failure("Cannot login. User has not subscribed to our service");
+                    throw new ArgumentException("Cannot login. User has not subscribed to our service");
                 }
                 if (user.Status != Status.Active)
                 {
-                    return Result.Failure("User is not yet activated");
+                    throw new ArgumentException("User is not yet activated");
                 }
                 var jwtToken = GenerateJwtToken(user.Id, user.UserName);
-                return Result.Success(jwtToken);
+                var userLogin = new UserLogin
+                {
+                    UserId = user.Id,
+                    Token = jwtToken
+                };
+                return userLogin;
             }
             catch (Exception ex)
             {
@@ -337,6 +343,7 @@ namespace Comgo.Infrastructure.Services
                 }
                 existingUser.Name = user.Name;
                 existingUser.Status = user.Status;
+                existingUser.UserCount = user.UserCount;
                 var update = await _userManager.UpdateAsync(existingUser);
                 if (!update.Succeeded)
                 {
@@ -421,6 +428,7 @@ namespace Comgo.Infrastructure.Services
             var jwtToken = jwtTokenHandler.WriteToken(token);
             return jwtToken;
         }
+        
     }
 
 }

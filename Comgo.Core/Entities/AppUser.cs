@@ -19,5 +19,6 @@ namespace Comgo.Core.Entities
         public UserType UserType { get; set; }
         public string StatusDesc { get { return Status.ToString(); } }
         public ICollection<Signature> Signatures { get; set; }
+        public int? UserCount { get; set; }
     }
 }

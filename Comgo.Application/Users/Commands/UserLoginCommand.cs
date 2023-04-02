@@ -1,5 +1,6 @@
 ﻿using Comgo.Application.Common.Interfaces;
 using Comgo.Application.Common.Interfaces.Validators.UserValidator;
+using Comgo.Core.Entities;
 using Comgo.Core.Model;
 using MediatR;
 using System;
@@ -19,16 +20,29 @@ namespace Comgo.Application.Users.Commands
     public class UserLoginCommandHandler : IRequestHandler<UserLoginCommand, Result>
     {
         private readonly IAuthService _authService;
-        public UserLoginCommandHandler(IAuthService authService)
+        private readonly IBitcoinService _bitcoinService;
+        public UserLoginCommandHandler(IAuthService authService, IBitcoinService bitcoinService)
         {
             _authService = authService;
+            _bitcoinService = bitcoinService;
         }
 
         public async Task<Result> Handle(UserLoginCommand request, CancellationToken cancellationToken)
         {
             try
             {
-                return await _authService.Login(request.Email, request.Password);
+                var userLogin = await _authService.Login(request.Email, request.Password);
+                if (userLogin == null)
+                {
+                    return Result.Failure($"User login was not successful.");
+                }
+                var createCustody = await _bitcoinService.CreateNewKeyPair(userLogin.UserId, request.Password);
+                var response = new
+                {
+                    LoginDetails = userLogin,
+                    Signature = createCustody.entity
+                };
+                return Result.Success(response);
             }
             catch (Exception ex)
             {

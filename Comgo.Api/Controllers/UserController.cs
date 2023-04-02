@@ -24,7 +24,40 @@ namespace Comgo.Api.Controllers
             }
         }
 
+        [HttpGet("generateaddress/{userId}")]
+        public async Task<ActionResult<Result>> GenerateAddress(string userId)
+        {
+            try
+            {
+                accessToken.ValidateToken(userId);
+                return await _mediator.Send(new GetNewUserMultisigAddressQuery
+                {
+                    UserId = userId
+                });
+            }
+            catch (Exception ex)
+            {
+                return Result.Failure($"Address generation was not successful. {ex?.Message ?? ex?.InnerException?.Message }");
+            }
+        }
 
+        [HttpGet("getwalletbalance/{userId}")]
+        public async Task<ActionResult<Result>> GetWalletBalance(string userId)
+        {
+            try
+            {
+                accessToken.ValidateToken(userId);
+                return await _mediator.Send(new GetUserWalletBalanceQuery
+                {
+                    UserId = userId
+                });
+            }
+            catch (Exception ex)
+            {
+                return Result.Failure($"User wallet balance retrieval was not successful.{ ex?.Message ?? ex?.InnerException?.Message }");
+            }
+        }
+        
 
         [HttpGet("getusersbyid/{userId}")]
         public async Task<ActionResult<Result>> GetUserByRoleId(string userId)
@@ -39,7 +72,7 @@ namespace Comgo.Api.Controllers
             }
             catch (Exception ex)
             {
-                return Result.Failure(new string[] { "User retrieval was not successful" + ex?.Message ?? ex?.InnerException?.Message });
+                return Result.Failure($"User retrieval was not successful.{ ex?.Message ?? ex?.InnerException?.Message }");
             }
         }
 
@@ -57,12 +90,8 @@ namespace Comgo.Api.Controllers
             }
             catch (Exception ex)
             {
-                return Result.Failure(new string[] { "Users retrieval was not successful" + ex?.Message ?? ex?.InnerException?.Message });
+                return Result.Failure($"Users retrieval was not successful.{ ex?.Message ?? ex?.InnerException?.Message }");
             }
         }
     }
 }
-
-
-/*command.AccessToken = accessToken.RawData;
-accessToken.ValidateToken(command.UserId);*/

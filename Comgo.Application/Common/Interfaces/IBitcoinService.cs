@@ -12,7 +12,8 @@ namespace Comgo.Application.Common.Interfaces
     public interface IBitcoinService
     {
         Task<(bool success, string message)> GenerateAddress(string userId);
-        Task<(bool success, string message, KeyPairResponse entity)> CreateNewKeyPair(string userId);
+        Task<(bool success, WalletBalance response)> GetWalletBalance(string userId);
+        Task<(bool success, string message, KeyPairResponse entity)> CreateNewKeyPair(string userId, string password);
         Task<Transaction> SignSignature(BitcoinAddress recipientAddress, Money amount, ScriptCoin coin, Money minerFee, BitcoinAddress changeAddress, PubKey userKey, PubKey systemKey);
         Task<(bool success, string message)> ConfirmUserTransaction(string userId, string email);
         Task<(bool success, string message)> CreateMultisigTransaction(string userid, string recipient);

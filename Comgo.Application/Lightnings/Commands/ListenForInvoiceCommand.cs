@@ -48,7 +48,7 @@ namespace Comgo.Application.Lightnings.Commands
                 {
                     return Result.Failure($"An error occured while confirming payment receipt. {paymentUpdateMessage}");
                 }
-                var createCustody = await _bitcoinService.CreateNewKeyPair(user.user.UserId);
+                //var createCustody = await _bitcoinService.CreateNewKeyPair(user.user.UserId);
                 return Result.Success("Invoice has been confirmed successfully.", listener);
             }
             catch (Exception ex)

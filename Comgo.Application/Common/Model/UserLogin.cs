@@ -4,12 +4,11 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Comgo.Core.Entities
+namespace Comgo.Application.Common.Model
 {
-    public class Signature : GeneralEntity
+    public class UserLogin
     {
-        public string UserPubKey { get; set; }
-        public string UserSafeDetails { get; set; }
         public string UserId { get; set; }
+        public string Token { get; set; }
     }
 }

@@ -17,5 +17,6 @@ namespace Comgo.Core.Entities
         public UserType UserType { get; set; }
         public bool EmailConfirmed { get; set; }
         public List<Signature> Signatures { get; set; }
+        public int? UserCount { get; set; }
     }
 }

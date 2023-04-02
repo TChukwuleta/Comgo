@@ -1,16 +1,15 @@
 ﻿using Comgo.Application.Common.Interfaces;
+using Comgo.Application.Common.Model;
 using Comgo.Application.Common.Model.Response;
+using Comgo.Core.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using NBitcoin;
 using NBXplorer;
 using NBXplorer.DerivationStrategy;
+using NBXplorer.Models;
 using Newtonsoft.Json;
 using QBitNinja.Client;
-using System;
-using System.IO;
-using System.Reflection.Metadata;
-using System.Text;
 
 namespace Comgo.Infrastructure.Services
 {
@@ -21,20 +20,16 @@ namespace Comgo.Infrastructure.Services
         private readonly IAppDbContext _context;
         private readonly IEncryptionService _encryptionService;
         private readonly IAuthService _authService;
-        private readonly IBitcoinCoreClient _bitcoinCoreClient;
         private readonly Network _network;
-        private readonly ChainName _chainNetwork;
-        public BitcoinService(IConfiguration config, IEmailService emailService, IAppDbContext context, 
-            IEncryptionService encryptionService, IAuthService authService, IBitcoinCoreClient bitcoinCoreClient)
+        public BitcoinService(IConfiguration config, IEmailService emailService, IAppDbContext context,
+            IEncryptionService encryptionService, IAuthService authService)
         {
             _config = config;
             _authService = authService;
-            _bitcoinCoreClient = bitcoinCoreClient;
             _encryptionService = encryptionService;
             _emailService = emailService;
             _context = context;
             _network = Network.RegTest;
-            _chainNetwork = ChainName.Regtest;
         }
 
         public async Task<(bool success, string message)> ConfirmUserTransaction(string userId, string email)
@@ -72,50 +67,57 @@ namespace Comgo.Infrastructure.Services
         }
 
 
-        public async Task<(bool success, string message, KeyPairResponse entity)> CreateNewKeyPair(string userId)
+        public async Task<(bool success, string message, KeyPairResponse entity)> CreateNewKeyPair(string userId, string password)
         {
             try
             {
-                var user = await _authService.GetUserById(userId);
+                var existingSignature = await _context.Signatures.FirstOrDefaultAsync(c => c.UserId == userId);
+                if (existingSignature != null)
+                {
+                    return (true, "User keys already exist", null);
+                }
                 var superAdmin = await _authService.GetSuperAdmin(userId);
+                superAdmin.user.UserCount += 1;
 
-                var userKey = new Key();
+                var userKey = new Party(new Mnemonic(Wordlist.English), password, new KeyPath($"5'/2'/{superAdmin.user.UserCount}"));
+
+                var userPubKey = userKey.AccountExtPubKey.GetWif(_network);
+                 var userPublicKey = userPubKey.ToString();
+                var extPubKey = userKey.AccountExtPubKey.ToBytes();
+                var extendedPubKey = System.Text.Encoding.ASCII.GetString(extPubKey);
+                var newSafeDetails = new SaveDetails
+                {
+                    KeyPath = userKey.AccountKeyPath.GetAccountKeyPath().ToStringWithEmptyKeyPathAware(),
+                    ExtPubKey = extendedPubKey,
+                    UserId = userId
+                };
+                var serializeDetails = JsonConvert.SerializeObject(newSafeDetails);
+
+                /*var userKey = new Key();
                 var userKeySecret = userKey.GetBitcoinSecret(_network).ToWif();
                 var userPubKey = userKey.PubKey.ToBytes();
-                var userPublicKey = Encoding.UTF8.GetString(userPubKey);
+                var userPublicKey = Encoding.UTF8.GetString(userPubKey);*/
 
-                var systemKey = new Key();
+                /*var systemKey = new Key();
                 var systemKeySecret = systemKey.GetBitcoinSecret(_network).ToWif();
                 var systemPubKey = systemKey.PubKey.ToBytes();
-                var systemPublicKey = Encoding.UTF8.GetString(systemPubKey);
+                var systemPublicKey = Encoding.UTF8.GetString(systemPubKey);*/
 
-
-                var existingSignature = superAdmin.user.Signatures.FirstOrDefault(c => c.UserId == userId);
-                if (existingSignature == null)
+                var newSignature = new Signature
                 {
-                    existingSignature.AdminUserId = superAdmin.user.UserId;
-                    existingSignature.SystemKey = _encryptionService.EncryptData(systemKeySecret);
-                    existingSignature.SystemPubKey = _encryptionService.EncryptData(systemPublicKey);
-                    existingSignature.UserPubKey = _encryptionService.EncryptData(userPublicKey);
-                    existingSignature.CreatedDate = DateTime.Now;
-                    existingSignature.Status = Core.Enums.Status.Active;
-                    existingSignature.UserId = userId;
-                    await _context.Signatures.AddAsync(existingSignature);
-                }
-                else
-                {
-                    existingSignature.AdminUserId = superAdmin.user.UserId;
-                    existingSignature.SystemKey = _encryptionService.EncryptData(systemKeySecret);
-                    existingSignature.SystemPubKey = _encryptionService.EncryptData(systemPublicKey);
-                    existingSignature.UserPubKey = _encryptionService.EncryptData(userPublicKey);
-                    _context.Signatures.Update(existingSignature);
-                }
+                    UserId = userId,
+                    UserPubKey = _encryptionService.EncryptData(userPublicKey),
+                    CreatedDate = DateTime.Now,
+                    Status = Core.Enums.Status.Active,
+                    UserSafeDetails = _encryptionService.EncryptData(serializeDetails)
+                };
+                await _context.Signatures.AddAsync(newSignature);
                 await _context.SaveChangesAsync(new CancellationToken());
 
                 var keyPairs = new KeyPairResponse
                 {
-                    PublicKey = userPublicKey,
-                    PrivateKey = userKeySecret
+                    Mnemonic = userKey.Mnemonic.ToString(),
+                    PublicKey = userPublicKey
                 };
                 return (true, "User keys created successfully", keyPairs);
             }
@@ -129,31 +131,41 @@ namespace Comgo.Infrastructure.Services
         {
             try
             {
-                var userPair = await _context.Signatures.FirstOrDefaultAsync(c => c.UserId == userId);
-                if (userPair == null)
-                {
-                    return (false, "An error occured while retrieving user key details. Kindly contact support");
-                }
-                var userPubKey = _encryptionService.DecryptData(userPair.UserPubKey);
-                var systemPubKey = _encryptionService.DecryptData(userPair.SystemPubKey);
-
-                var userPublicKey = new PubKey(Encoding.ASCII.GetBytes(userPubKey));
-                var adminPublicKey = new PubKey(Encoding.ASCII.GetBytes(systemPubKey));
-                // Generate p2sh 2 of 2 multisig address
-                var redeemScript = PayToMultiSigTemplate
-                    .Instance
-                    .GenerateScriptPubKey(2, new[] { userPublicKey, adminPublicKey })
-                    .PaymentScript;
-
-                var address = redeemScript.Hash.GetAddress(_network);
-                return (true, JsonConvert.SerializeObject(address.ToString()));
+                var client = CreateNBXplorerClient(_network);
+                var strategy = await GetDerivationStrategy(userId);
+                await client.TrackAsync(strategy);
+                var address = (await client.GetUnusedAsync(strategy, DerivationFeature.Deposit)).Address;
+                return (true, address.ToString());
             }
             catch (Exception ex)
             {
-
                 throw ex;
             }
         }
+
+        public async Task<(bool success, WalletBalance response)> GetWalletBalance(string userId)
+        {
+            try
+            {
+                var client = CreateNBXplorerClient(_network);
+                var strategy = await GetDerivationStrategy(userId);
+                var userBalance = await client.GetBalanceAsync(strategy);
+                var balanceResponse = new WalletBalance
+                {
+                    Available = userBalance.Available.ToString(),
+                    Confirmed = userBalance.Confirmed.ToString(),
+                    Unconfirmed = userBalance.Unconfirmed.ToString(),
+                    Total = userBalance.Total.ToString(),
+                    Immature = userBalance.Immature.ToString()
+                };
+                return (true, balanceResponse);
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+
 
 
         public async Task<(bool success, string message)> CreateMultisigTransaction(string userid, string recipient)
@@ -162,15 +174,26 @@ namespace Comgo.Infrastructure.Services
             try
             {
                 // Get public key for both user and admin
+                var superAdmin = await _authService.GetSuperAdmin(userid);
+                var systemPair = await _context.Signatures.FirstOrDefaultAsync(c => c.UserId == superAdmin.user.UserId);
+                if (systemPair == null)
+                {
+                    return (false, "An error occured while retrieving system user key details. Kindly contact support");
+                }
                 var userPair = await _context.Signatures.FirstOrDefaultAsync(c => c.UserId == userid);
                 if (userPair == null)
                 {
                     return (false, "An error occured while retrieving user key details. Kindly contact support");
                 }
                 var decryptedUserPubKey = _encryptionService.DecryptData(userPair.UserPubKey);
-                var decryptedAdminPubKey = _encryptionService.DecryptData(userPair.SystemPubKey);
-                var userPublicKey = new PubKey(Encoding.ASCII.GetBytes(decryptedUserPubKey));
-                var systemPublicKey = new PubKey(Encoding.ASCII.GetBytes(decryptedAdminPubKey));
+                var decryptedAdminPubKey = _encryptionService.DecryptData(systemPair.UserPubKey);
+                /*var userPublicKey = new PubKey(Encoding.ASCII.GetBytes(decryptedUserPubKey));
+                var systemPublicKey = new PubKey(Encoding.ASCII.GetBytes(decryptedAdminPubKey));*/
+                var userPubKey = new BitcoinExtPubKey(decryptedUserPubKey, _network).ToWif();
+                var systemPubKey = new BitcoinExtPubKey(decryptedAdminPubKey, _network).ToWif();
+
+                var userPublicKey = new PubKey(userPubKey);
+                var systemPublicKey = new PubKey(systemPubKey);
 
                 // Get the redeem script and addresses
                 var scriptPubKey = PayToMultiSigTemplate
@@ -210,7 +233,7 @@ namespace Comgo.Infrastructure.Services
                 var sendAmount = txInAmount - minerFee;
 
                 // Sign transactions with pub key
-               var signedTransaction =  await SignSignature(lucasAddress, sendAmount, coinToSpend, minerFee, changeAddress, userPublicKey, systemPublicKey);
+                var signedTransaction = await SignSignature(lucasAddress, sendAmount, coinToSpend, minerFee, changeAddress, userPublicKey, systemPublicKey);
 
                 // Broadcast signed transactions
                 var broadcastResponse = client.Broadcast(signedTransaction).Result;
@@ -227,7 +250,7 @@ namespace Comgo.Infrastructure.Services
             }
         }
 
-        public async Task<Transaction> SignSignature(BitcoinAddress recipientAddress, Money amount, ScriptCoin coin, Money minerFee, BitcoinAddress changeAddress, PubKey userKey, PubKey systemKey)
+        public async Task<NBitcoin.Transaction> SignSignature(BitcoinAddress recipientAddress, Money amount, ScriptCoin coin, Money minerFee, BitcoinAddress changeAddress, PubKey userKey, PubKey systemKey)
         {
             var builder = _network.CreateTransactionBuilder();
             try
@@ -266,7 +289,72 @@ namespace Comgo.Infrastructure.Services
                 throw ex;
             }
         }
+
+
+        private static ExplorerClient CreateNBXplorerClient(Network network)
+        {
+            NBXplorerNetworkProvider provider = new NBXplorerNetworkProvider(network.ChainName);
+            ExplorerClient client = new ExplorerClient(provider.GetFromCryptoCode(network.NetworkSet.CryptoCode));
+            return client;
+        }
+
+        private static PSBT Sign(Party party, DerivationStrategyBase derivationStrategy, PSBT psbt)
+        {
+            psbt = psbt.Clone();
+        }
+
+        private static async Task<NewTransactionEvent> WaitTransaction(LongPollingNotificationSession events, DerivationStrategyBase derivationStrategy)
+        {
+            while (true)
+            {
+                var evt = await events.NextEventAsync();
+                if (evt is NewTransactionEvent tx)
+                {
+                    if (tx.DerivationStrategy == derivationStrategy)
+                    {
+                        return tx;
+                    }
+                }
+            }
+        }
+
+        private async Task<DerivationStrategyBase> GetDerivationStrategy(string userid)
+        {
+            try
+            {
+                var superAdmin = await _authService.GetSuperAdmin(userid);
+                var systemPair = await _context.Signatures.FirstOrDefaultAsync(c => c.UserId == superAdmin.user.UserId);
+                if (systemPair == null)
+                {
+                    throw new ArgumentException("An error occured while retrieving system user key details. Kindly contact support");
+                }
+                var userPair = await _context.Signatures.FirstOrDefaultAsync(c => c.UserId == userid);
+                if (userPair == null)
+                {
+                    throw new ArgumentException("An error occured while retrieving user key details. Kindly contact support");
+                }
+                var decryptedUserPubKey = _encryptionService.DecryptData(userPair.UserPubKey);
+                var decryptedAdminPubKey = _encryptionService.DecryptData(systemPair.UserPubKey);
+
+                var userPubKey = new BitcoinExtPubKey(decryptedUserPubKey, _network).ExtPubKey;
+                var systemPubKey = new BitcoinExtPubKey(decryptedAdminPubKey, _network).ExtPubKey;
+
+                var factory = new DerivationStrategyFactory(_network);
+                var derivationStrategy = factory.CreateMultiSigDerivationStrategy(new[]
+                {
+                    userPubKey,
+                    systemPubKey
+                }, 2, new DerivationStrategyOptions() { ScriptPubKeyType = ScriptPubKeyType.SegwitP2SH });
+                return derivationStrategy;
+            }
+            catch (Exception ex)
+            {
+
+                throw ex;
+            }
+        }
     }
+
 }
 
 

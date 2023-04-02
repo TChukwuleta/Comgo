@@ -1,4 +1,5 @@
-﻿using Comgo.Core.Entities;
+﻿using Comgo.Application.Common.Model;
+using Comgo.Core.Entities;
 using Comgo.Core.Model;
 using System;
 using System.Collections.Generic;
@@ -16,7 +17,7 @@ namespace Comgo.Application.Common.Interfaces
         Task<Result> ChangePasswordAsync(string email, string oldPassword, string newPassword);
         Task<Result> ResetPassword(string email, string password);
         Task<Result> EmailVerification(string email, string otp);
-        Task<Result> Login(string email, string password);
+        Task<UserLogin> Login(string email, string password);
         Task<Result> GenerateOTP(string email, string purpose);
         Task<Result> ValidationOTP(string email, string otp, string purpose);
         Task<(Result result, User user)> GetUserByEmail(string email);
