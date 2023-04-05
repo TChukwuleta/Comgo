@@ -99,6 +99,7 @@ builder.Services.AddTransient<ILightningService, LightningService>();
 builder.Services.AddTransient<IBitcoinService, BitcoinService>();
 builder.Services.AddTransient<IPaystackService, PaystackService>();
 builder.Services.AddTransient<IBitcoinCoreClient, BitcoinCoreClient>();
+builder.Services.AddHostedService<BackgroundWorkerService>();
 
 var emailConfig = builder.Configuration
         .GetSection("EmailConfiguration")

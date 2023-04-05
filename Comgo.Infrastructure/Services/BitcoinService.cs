@@ -5,11 +5,14 @@ using Comgo.Core.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using NBitcoin;
+using NBitcoin.RPC;
 using NBXplorer;
 using NBXplorer.DerivationStrategy;
 using NBXplorer.Models;
 using Newtonsoft.Json;
 using QBitNinja.Client;
+using System.Net;
+using System.Text;
 
 namespace Comgo.Infrastructure.Services
 {
@@ -32,27 +35,28 @@ namespace Comgo.Infrastructure.Services
             _network = Network.RegTest;
         }
 
-        public async Task<(bool success, string message)> ConfirmUserTransaction(string userId, string email)
+        public async Task<(bool success, string message)> ConfirmUserTransaction(string userId, string reference)
         {
             try
             {
                 var user = await _authService.GetUserById(userId);
                 var userSigExist = await _authService.GetSuperAdmin(userId);
 
+                // Check that the public key of the user who wants to make a transfer exist
+                // If the user does exist, send OTP to the mail, else throw an error
                 var userKey = await _context.Signatures.FirstOrDefaultAsync(c => c.UserId == userId);
                 if (userKey == null)
                 {
                     return (false, "No user key record found. Please contact support");
                 }
-
-                var generateOtp = await _authService.GenerateOTP(email, "confirm-transaction");
+                var generateOtp = await _authService.GenerateOTP(user.user.Email, "confirm-transaction");
                 var errorMessage = generateOtp.Message != null ? generateOtp.Message : generateOtp.Messages.FirstOrDefault();
                 if (!generateOtp.Succeeded)
                 {
                     throw new ArgumentException(errorMessage);
                 }
                 //var sendEmail = await _emailService.SendEmailMessage(generateOtp.Entity.ToString(), "Transaction confirmation", user.user.Email);
-                var sendEmail = await _emailService.SendRegistrationEmailToUser(email, generateOtp.Entity.ToString());
+                var sendEmail = await _emailService.SendConfirmationEmailToUser(user.user.Email, user.user.Name, reference, generateOtp.Entity.ToString());
                 if (!sendEmail)
                 {
                     throw new ArgumentException("An error occured while trying to confirm your transaction");
@@ -61,7 +65,6 @@ namespace Comgo.Infrastructure.Services
             }
             catch (Exception ex)
             {
-
                 throw ex;
             }
         }
@@ -71,6 +74,9 @@ namespace Comgo.Infrastructure.Services
         {
             try
             {
+                // This happens for every user login.
+                // Check that the user has his/her public key existing
+                // If the user does not exist, create a new one
                 var existingSignature = await _context.Signatures.FirstOrDefaultAsync(c => c.UserId == userId);
                 if (existingSignature != null)
                 {
@@ -80,28 +86,24 @@ namespace Comgo.Infrastructure.Services
                 superAdmin.user.UserCount += 1;
 
                 var userKey = new Party(new Mnemonic(Wordlist.English), password, new KeyPath($"5'/2'/{superAdmin.user.UserCount}"));
+                
+                // Get the extkey
+                var rootKey = userKey.RootExtKey.ToBytes();
+                var rootExtKey = rootKey.ToString();
 
+                // Get ext pubkey
                 var userPubKey = userKey.AccountExtPubKey.GetWif(_network);
                  var userPublicKey = userPubKey.ToString();
                 var extPubKey = userKey.AccountExtPubKey.ToBytes();
                 var extendedPubKey = System.Text.Encoding.ASCII.GetString(extPubKey);
                 var newSafeDetails = new SaveDetails
                 {
+                    ExtKey = rootExtKey,
                     KeyPath = userKey.AccountKeyPath.GetAccountKeyPath().ToStringWithEmptyKeyPathAware(),
                     ExtPubKey = extendedPubKey,
                     UserId = userId
                 };
                 var serializeDetails = JsonConvert.SerializeObject(newSafeDetails);
-
-                /*var userKey = new Key();
-                var userKeySecret = userKey.GetBitcoinSecret(_network).ToWif();
-                var userPubKey = userKey.PubKey.ToBytes();
-                var userPublicKey = Encoding.UTF8.GetString(userPubKey);*/
-
-                /*var systemKey = new Key();
-                var systemKeySecret = systemKey.GetBitcoinSecret(_network).ToWif();
-                var systemPubKey = systemKey.PubKey.ToBytes();
-                var systemPublicKey = Encoding.UTF8.GetString(systemPubKey);*/
 
                 var newSignature = new Signature
                 {
@@ -126,6 +128,92 @@ namespace Comgo.Infrastructure.Services
                 throw ex;
             }
         }
+
+        public async Task<(bool success, string message)> CreatePSBT(string userid, string recipient)
+        {
+            try
+            {
+                // Get User required keys
+                var userPair = await _context.Signatures.FirstOrDefaultAsync(c => c.UserId == userid);
+                if (userPair == null)
+                {
+                    return (false, "An error occured while retrieving user key details. Kindly contact support");
+                }
+                var safeDetailsDecrypted = _encryptionService.DecryptData(userPair.UserSafeDetails);
+                var safeDetails = JsonConvert.DeserializeObject<SaveDetails>(safeDetailsDecrypted);
+
+                var pubKeyBytes = Encoding.ASCII.GetBytes(safeDetails.ExtPubKey);
+                var userExtPubKey = new ExtPubKey(pubKeyBytes);
+
+                var keyPath = new KeyPath(safeDetails.KeyPath);
+                var userRootKeyPath = new RootedKeyPath(userExtPubKey.ParentFingerprint, keyPath);
+
+                var getExtKey = Encoding.ASCII.GetBytes(safeDetails.ExtKey);
+                var userExtKey = ExtKey.CreateFromBytes(getExtKey);
+
+
+                // Get system required keys
+                var systemAdmin = await _authService.GetSuperAdmin(userid);
+                var systemPair = await _context.Signatures.FirstOrDefaultAsync(c => c.UserId == systemAdmin.user.UserId);
+                if (systemPair == null)
+                {
+                    return (false, "An error occured while retrieving system key details. Kindly contact support");
+                }
+                var systemDecryptedSafeDetails = _encryptionService.DecryptData(systemPair.UserSafeDetails);
+                var systemSafeDetails = JsonConvert.DeserializeObject<SaveDetails>(systemDecryptedSafeDetails);
+
+                var keyBytes = Encoding.ASCII.GetBytes(systemSafeDetails.ExtPubKey);
+                var systemExtPubKey = new ExtPubKey(keyBytes);
+
+                var sysKeyPath = new KeyPath(safeDetails.KeyPath);
+                var systemRootKeyPath = new RootedKeyPath(systemExtPubKey.ParentFingerprint, sysKeyPath);
+
+                var getSysExtKey = Encoding.ASCII.GetBytes(systemSafeDetails.ExtKey);
+                var systemExtKey = ExtKey.CreateFromBytes(getSysExtKey);
+
+
+                // Get client, derivation strategy
+                var client = CreateNBXplorerClient(_network);
+                var strategy = await GetDerivationStrategy(userid);
+                var bitcoinAddress = BitcoinAddress.Create(recipient, _network);
+
+                // create psbt
+                var psbt = (await client.CreatePSBTAsync(strategy, new CreatePSBTRequest()
+                {
+                    Destinations =
+                    {
+                        new CreatePSBTDestination()
+                        {
+                            Destination = bitcoinAddress,
+                            Amount = Money.Coins(0.4m),
+                            SubstractFees = true
+                        }
+                    },
+                    FeePreference = new FeePreference()
+                    {
+                        ExplicitFeeRate = new FeeRate(10.0m)
+                    }
+                })).PSBT;
+
+                // User signs the psbt
+                var userSigns = Sign(userExtPubKey, userRootKeyPath, userExtKey, strategy, psbt);
+                // System signs the psbt
+                var systemSigns = Sign(systemExtPubKey, systemRootKeyPath, systemExtKey, strategy, psbt);
+                // Both signed psbt are combined (2 of 2)
+                var signedPSBT = userSigns.Combine(systemSigns);
+                signedPSBT.Finalize();
+                // Get transactions
+                var signedTransaction = signedPSBT.ExtractTransaction();
+                // Broadcast the signed transaction to the blockchain
+                await client.BroadcastAsync(signedTransaction);
+                return (true, "transaction broadcasted successfully");
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+
 
         public async Task<(bool success, string message)> GenerateAddress(string userId)
         {
@@ -166,8 +254,51 @@ namespace Comgo.Infrastructure.Services
             }
         }
 
+        public async Task<(bool success, string message)> ListTransactions(string userid)
+        {
+            var txResponse = new List<TxOutResponse>();
+            try
+            {
+                var client = CreateNBXplorerClient(_network);
+                var strategy = await GetDerivationStrategy(userid);
+                var transactionList = await client.GetTransactionsAsync(strategy);
+                return (true, JsonConvert.SerializeObject(transactionList));
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+
+        public async Task<(bool success, string message)> SendToAddress(string address, string amountBtc)
+        {
+            var username = _config["Bitcoin:username"];
+            var password = _config["Bitcoin:password"];
+            var url = _config["Bitcoin:URL"];
+            try
+            {
+                var destinationAddress = BitcoinAddress.Create(address, _network);
+                var credentials = new NetworkCredential { Password = password, UserName = username };
+                var rpc = new RPCClient(credentials, url, _network);
+                Money.TryParse(amountBtc, out Money value);
+                await rpc.SendToAddressAsync(destinationAddress.ScriptPubKey, value);
+                return (true, "Money sent successfully");
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
 
 
+        public Task<(bool success, string message)> TransactionLookOut()
+        {
+            throw new NotImplementedException();
+        }
+
+
+        
+        // Still working on this. Refactoring to fit in NBXplorer
         public async Task<(bool success, string message)> CreateMultisigTransaction(string userid, string recipient)
         {
             var client = new QBitNinjaClient(_network);
@@ -250,11 +381,13 @@ namespace Comgo.Infrastructure.Services
             }
         }
 
+        // Going to derive a new method
         public async Task<NBitcoin.Transaction> SignSignature(BitcoinAddress recipientAddress, Money amount, ScriptCoin coin, Money minerFee, BitcoinAddress changeAddress, PubKey userKey, PubKey systemKey)
         {
             var builder = _network.CreateTransactionBuilder();
             try
             {
+                var pub = new ExtPubKey("bla");
                 var unsignedTransaction = builder
                     .AddCoin(coin)
                     .Send(recipientAddress, amount)
@@ -285,12 +418,14 @@ namespace Comgo.Infrastructure.Services
             }
             catch (Exception ex)
             {
-
                 throw ex;
             }
         }
 
+        
 
+
+        // This method creates client connection to NBXplorer
         private static ExplorerClient CreateNBXplorerClient(Network network)
         {
             NBXplorerNetworkProvider provider = new NBXplorerNetworkProvider(network.ChainName);
@@ -298,11 +433,25 @@ namespace Comgo.Infrastructure.Services
             return client;
         }
 
-        private static PSBT Sign(Party party, DerivationStrategyBase derivationStrategy, PSBT psbt)
+        private static PSBT Sign(ExtPubKey pubkey, RootedKeyPath keypath, ExtKey extKey, DerivationStrategyBase derivationStrategy, PSBT psbt)
         {
-            psbt = psbt.Clone();
+            try
+            {
+                psbt = psbt.Clone();
+                psbt.RebaseKeyPaths(pubkey, keypath);
+                var spend = psbt.GetBalance(derivationStrategy, pubkey, keypath);
+                psbt.SignAll(derivationStrategy, extKey.Derive(keypath), keypath);
+                return psbt;
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+
         }
 
+
+        // Look out for transaction sent to any user's wallet on the system
         private static async Task<NewTransactionEvent> WaitTransaction(LongPollingNotificationSession events, DerivationStrategyBase derivationStrategy)
         {
             while (true)
@@ -318,6 +467,7 @@ namespace Comgo.Infrastructure.Services
             }
         }
 
+        // Handle derivation strategy which is what the system would use to track every user's wallet on the system
         private async Task<DerivationStrategyBase> GetDerivationStrategy(string userid)
         {
             try
@@ -349,24 +499,8 @@ namespace Comgo.Infrastructure.Services
             }
             catch (Exception ex)
             {
-
                 throw ex;
             }
         }
     }
-
 }
-
-
-/*Console.WriteLine("Enter private key:");
-string private_key = Console.ReadLine();
-var bitcoinPrivateKey = new BitcoinSecret(private_key, Network.TestNet);
-
-var legacy_address = bitcoinPrivateKey.GetAddress(ScriptPubKeyType.Legacy);
-var segwitp2sh_address = bitcoinPrivateKey.GetAddress(ScriptPubKeyType.SegwitP2SH);
-var nativesegwit_address = bitcoinPrivateKey.GetAddress(ScriptPubKeyType.Segwit);
-
-Console.WriteLine("Private Key :" + bitcoinPrivateKey);
-Console.WriteLine("Legacy Address :" + legacy_address);
-Console.WriteLine("Segwit-P2SH Address :" + segwitp2sh_address);
-Console.WriteLine("Bech32 Address :" + nativesegwit_address);*/

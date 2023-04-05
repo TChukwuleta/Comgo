@@ -35,7 +35,7 @@ namespace Comgo.Application.Transactions.Commands
 
         public async Task<Result> Handle(CreateTransactionsCommand request, CancellationToken cancellationToken)
         {
-            var reference = $"BitPaywall_{DateTime.Now.Ticks}";
+            var reference = $"Comgo_{DateTime.Now.Ticks}";
             try
             {
                 var user = await _authService.GetUserById(request.UserId);
@@ -51,12 +51,11 @@ namespace Comgo.Application.Transactions.Commands
                     {
                         UserId = request.UserId,
                         Amount = item.Amount,
-                        CreditAccount = item.CreditAccount,
+                        CreditAddress = item.CreditAccount,
                         TransactionType = item.TransactionType,
                         TransactionReference = reference,
-                        DebitAccount = item.DebitAccount,
+                        DebitAddress = item.DebitAccount,
                         TransactionStatus = TransactionStatus.Success,
-                        AccountId = request.AccountId,
                         CreatedDate = DateTime.Now,
                         Narration = request.Description,
                         Status = Status.Active

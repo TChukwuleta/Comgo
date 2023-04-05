@@ -5,6 +5,7 @@ using Comgo.Infrastructure.Utility;
 using MediatR;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
 
 namespace Comgo.Api.Controllers
 {
@@ -30,6 +31,7 @@ namespace Comgo.Api.Controllers
         {
             try
             {
+                accessToken.ValidateToken(command.UserId);
                 return await _mediator.Send(command);
             }
             catch (Exception ex)
@@ -38,12 +40,29 @@ namespace Comgo.Api.Controllers
             }
         }
 
+        [HttpGet("getbitcointransactions/{userid}")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        public async Task<ActionResult<Result>> GetBitcoinTransactions(string userid)
+        {
+            try
+            {
+                accessToken.ValidateToken(userid);
+                return await _mediator.Send(new GetAllBitcoinTransactionQuery {UserId = userid });
+            }
+            catch (Exception ex)
+            {
+                return Result.Failure($"Transactions retrieval by user failed. Error: {ex?.Message ?? ex?.InnerException?.Message}");
+            }
+        }
+
+
         [HttpGet("gettransactionsbyid/{skip}/{take}/{userid}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         public async Task<ActionResult<Result>> GetAllTransactionsByUser(int skip, int take, string userid)
         {
             try
             {
+                accessToken.ValidateToken(userid);
                 return await _mediator.Send(new GetAllTransactionsQuery { Skip = skip, Take = take, UserId = userid });
             }
             catch (Exception ex)
@@ -58,6 +77,7 @@ namespace Comgo.Api.Controllers
         {
             try
             {
+                accessToken.ValidateToken(userid);
                 return await _mediator.Send(new GetTransactionByIdQuery { Id = id, UserId = userid });
             }
             catch (Exception ex)
@@ -72,6 +92,7 @@ namespace Comgo.Api.Controllers
         {
             try
             {
+                accessToken.ValidateToken(userid);
                 return await _mediator.Send(new GetTransactionByReferenceQuery { Reference = txnref, UserId = userid });
             }
             catch (Exception ex)
@@ -86,6 +107,7 @@ namespace Comgo.Api.Controllers
         {
             try
             {
+                accessToken.ValidateToken(userid);
                 return await _mediator.Send(new GetCreditTransactionByUserIdQuery { UserId = userid, Skip = skip, Take = take });
             }
             catch (Exception ex)
@@ -100,6 +122,7 @@ namespace Comgo.Api.Controllers
         {
             try
             {
+                accessToken.ValidateToken(userid);
                 return await _mediator.Send(new GetDebitTransactionByUserIdQuery { UserId = userid, Skip = skip, Take = take });
             }
             catch (Exception ex)

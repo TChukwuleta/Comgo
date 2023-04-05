@@ -1,4 +1,6 @@
-﻿using Comgo.Application.Users.Queries;
+﻿using Comgo.Application.Transactions.Commands;
+using Comgo.Application.Users.Commands;
+using Comgo.Application.Users.Queries;
 using Comgo.Core.Model;
 using Comgo.Infrastructure.Utility;
 using MediatR;
@@ -21,6 +23,49 @@ namespace Comgo.Api.Controllers
             if (accessToken == null)
             {
                 throw new Exception("You are not authorized!");
+            }
+        }
+
+
+        [HttpPost("sendmoneyrequest")]
+        public async Task<ActionResult<Result>> CreateTransaction(SendPaymentCommand command)
+        {
+            try
+            {
+                accessToken.ValidateToken(command.UserId);
+                return await _mediator.Send(command);
+            }
+            catch (Exception ex)
+            {
+                return Result.Failure($"Failed to create payment request. Error: {ex?.Message ?? ex?.InnerException?.Message}");
+            }
+        }
+
+        [HttpPost("validateandmakepayment")]
+        public async Task<ActionResult<Result>> ValidateAndMakePayment(ValidatePaymentCommand command)
+        {
+            try
+            {
+                accessToken.ValidateToken(command.UserId);
+                return await _mediator.Send(command);
+            }
+            catch (Exception ex)
+            {
+                return Result.Failure($"Failed to maked payment. Error: {ex?.Message ?? ex?.InnerException?.Message}");
+            }
+        }
+
+        [HttpPost("sendtoaddress")]
+        public async Task<ActionResult<Result>> SendToAddress(SendToWalletAddressCommand command)
+        {
+            try
+            {
+                accessToken.ValidateToken(command.UserId);
+                return await _mediator.Send(command);
+            }
+            catch (Exception ex)
+            {
+                return Result.Failure($"Failed to send payment. Error: {ex?.Message ?? ex?.InnerException?.Message}");
             }
         }
 

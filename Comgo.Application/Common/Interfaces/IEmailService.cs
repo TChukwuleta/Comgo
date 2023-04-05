@@ -10,6 +10,7 @@ namespace Comgo.Application.Common.Interfaces
     public interface IEmailService
     {
         Task<bool> SendRegistrationEmailToUser(string Email, string message);
+        Task<bool> SendConfirmationEmailToUser(string email, string firstname, string reference, string message);
         Task<bool> SendEmailMessage(string body, string subject, string recipient);
         void SendEmail(Message message);
     }

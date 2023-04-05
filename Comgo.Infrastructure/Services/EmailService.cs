@@ -20,6 +20,7 @@ namespace Comgo.Infrastructure.Services
             _emailConfig = emailConfig;
         }
 
+        
         public void SendEmail(Comgo.Application.Common.Interfaces.Message message)
         {
             var emailMessage = CreateEmailMessage(message);
@@ -58,6 +59,26 @@ namespace Comgo.Infrastructure.Services
             {
                 //var generateCode = GenerateCode(6);
                 var sendUserEmail = new Comgo.Application.Common.Interfaces.Message(new string[] { Email }, "COMGO-REGISTRATION", "Hi, " + Email + ". Thank you for registering. Kindly complete your registration with the CODE: " + message);
+                SendEmail(sendUserEmail);
+                if (sendUserEmail == null)
+                {
+                    return false;
+                }
+                return true;
+
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+
+        public async Task<bool> SendConfirmationEmailToUser(string email, string firstname, string reference, string message)
+        {
+            try
+            {
+                //var generateCode = GenerateCode(6);
+                var sendUserEmail = new Comgo.Application.Common.Interfaces.Message(new string[] { email }, "COMGO-REGISTRATION", "Hi, " + firstname + $". A transaction with transaction reference {reference} was initiated. Kindly use the OTP if you would like to proceed with this transaction: " + message);
                 SendEmail(sendUserEmail);
                 if (sendUserEmail == null)
                 {

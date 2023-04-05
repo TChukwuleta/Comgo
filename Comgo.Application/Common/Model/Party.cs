@@ -27,6 +27,7 @@ namespace Comgo.Application.Common.Model
 
     public class SaveDetails
     {
+        public string ExtKey { get; set; }
         public string ExtPubKey { get; set; }
         public string KeyPath { get; set; }
         public string UserId { get; set; }
