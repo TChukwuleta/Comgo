@@ -29,7 +29,7 @@ namespace Comgo.Application.Paystacks.Commands
             {
                 var user = await _authService.GetUserByEmail(request.Email);
                 if (user.user == null)
-                {
+                {                          
                     return Result.Failure("Unable to make payment. Invalid user details");
                 }
                 var verifyPayment = await _paystackService.VerifyPayment(request.Reference);

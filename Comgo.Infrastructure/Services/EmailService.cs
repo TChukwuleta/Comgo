@@ -1,10 +1,10 @@
 ﻿using Comgo.Application.Common.Interfaces;
-using MailKit.Net.Smtp;
 using Microsoft.Extensions.Configuration;
 using MimeKit;
-using System.Net.Mail;
+using SendGrid;
+using SendGrid.Helpers.Mail;
 using System.Net;
-using NBitcoin.Protocol;
+using System.Text.RegularExpressions;
 
 namespace Comgo.Infrastructure.Services
 {
@@ -25,6 +25,28 @@ namespace Comgo.Infrastructure.Services
         {
             var emailMessage = CreateEmailMessage(message);
             Send(emailMessage);
+        }
+
+        public async Task<bool> SendEmailAsync(string email, string subject, string htmlMessage)
+        {
+            var key = _config["SendGrid:ApiKey"];
+            var name = _config["SendGrid:UserName"];
+            var fromAddress = _config["SendGrid:From"];
+            try
+            {
+                var sendGridClient = new SendGridClient(key);
+                var from = new EmailAddress(fromAddress, name);
+                var to = new EmailAddress(email);
+                var plainTextContent = Regex.Replace(htmlMessage, "<[^>]*>", "");
+                var msg = MailHelper.CreateSingleEmail(from, to, subject,
+                plainTextContent, htmlMessage);
+                var response = await sendGridClient.SendEmailAsync(msg);
+                return response.IsSuccessStatusCode;
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
         }
 
         public async Task<bool> SendEmailMessage(string body, string subject, string recipient)

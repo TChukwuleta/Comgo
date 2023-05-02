@@ -66,8 +66,7 @@ namespace Comgo.Application.Users.Commands
                 {
                     return Result.Failure("An error occured when generating otp");
                 }
-                //var sendEmail = await _emailService.SendEmailMessage(generateOtp.Entity.ToString(), "New User Regstration", request.Email);
-                var sendEmail = await _emailService.SendRegistrationEmailToUser(request.Email, generateOtp.Entity.ToString());
+                var sendEmail = await _emailService.SendEmailAsync(request.Email, "User Registration", $"Thank you for registering on Comgo application. Kindly use the folowing OTP to conclude your registration {generateOtp.Entity.ToString()}");
                 if (!sendEmail)
                 {
                     return Result.Failure("An error occured while sending email");

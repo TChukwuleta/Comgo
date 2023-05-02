@@ -1,5 +1,4 @@
-﻿using Comgo.Application.Transactions.Commands;
-using Comgo.Application.Users.Commands;
+﻿using Comgo.Application.Users.Commands;
 using Comgo.Application.Users.Queries;
 using Comgo.Core.Model;
 using Comgo.Infrastructure.Utility;

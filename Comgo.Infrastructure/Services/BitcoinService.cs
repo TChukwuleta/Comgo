@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using NBitcoin;
 using NBitcoin.RPC;
+using NBitcoin.Scripting;
 using NBXplorer;
 using NBXplorer.DerivationStrategy;
 using NBXplorer.Models;
@@ -89,7 +90,11 @@ namespace Comgo.Infrastructure.Services
                 
                 // Get the extkey
                 var rootKey = userKey.RootExtKey.ToBytes();
-                var rootExtKey = rootKey.ToString();
+                var rootExtKey = Encoding.ASCII.GetString(rootKey);
+
+                /*var testBytes = Encoding.ASCII.GetBytes(rootExtKey);
+                var newKeey = ExtKey.CreateFromBytes(testBytes);
+                var anotherg = ExtKey.CreateFromBytes(rootKey);*/
 
                 // Get ext pubkey
                 var userPubKey = userKey.AccountExtPubKey.GetWif(_network);
@@ -129,6 +134,162 @@ namespace Comgo.Infrastructure.Services
             }
         }
 
+        public async Task<(bool success, string message, KeyPairResponse entity)> CreateNewKeyPairAsync(string userId)
+        {
+            try
+            {
+                var existingSignature = await _context.Signatures.FirstOrDefaultAsync(c => c.UserId == userId);
+                if (existingSignature != null)
+                {
+                    return (true, "User keys already exist", null);
+                }
+                var superAdmin = await _authService.GetSuperAdmin(userId);
+                // Generate key for user
+                var userKey = new Key();
+                var userPubkey = userKey.PubKey;
+
+                // Generate key for admin
+                var adminKey = new Key();
+                var adminPubkey = adminKey.PubKey;
+
+                var cosigners = new List<PubKey>
+                {
+                    adminPubkey,
+                    userPubkey,
+                };
+
+                // Convert the list of PubKey objects to a list of PubKeyProvider objects
+                List<PubKeyProvider> pubKeysProvider = new List<PubKeyProvider>();
+                foreach (var cosigner in cosigners)
+                {
+                    var provider = PubKeyProvider.NewConst(cosigner);
+                    pubKeysProvider.Add(provider);
+                }
+
+                // Create an output descriptor object that describes the multisig wallet
+                var descriptor = OutputDescriptor.NewMulti(2, pubKeysProvider, true, _network);
+
+                var newSignature = new Signature
+                {
+                    UserId = userId,
+                    UserPubKey = _encryptionService.EncryptData(userPubkey.ToHex()),
+                    AdminPubKey = _encryptionService.EncryptData(adminPubkey.ToHex()),
+                    CreatedDate = DateTime.Now,
+                    Status = Core.Enums.Status.Active,
+                    UserSafeDetails = descriptor.ToString(),
+
+                };
+                await _context.Signatures.AddAsync(newSignature);
+                await _context.SaveChangesAsync(new CancellationToken());
+
+                var keyPairs = new KeyPairResponse
+                {
+                    PrivateKey = userKey.GetWif(_network).ToString(),
+                    PublicKey = userPubkey.ToHex()
+                };
+                return (true, "User keys created successfully", keyPairs);
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+
+        public async Task<(bool success, string message)> GenerateAddress(string userId)
+        {
+            try
+            {
+                var signature = await _context.Signatures.FirstOrDefaultAsync(c => c.UserId == userId);
+                var descriptor = OutputDescriptor.Parse(signature.UserSafeDetails, _network);
+
+
+                return (true, "Ayo".ToString());
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+
+        public async Task<(bool success, string message)> GenerateAddressAsync(string userId)
+        {
+            try
+            {
+                var client = CreateNBXplorerClient(_network);
+                var strategy = await GetDerivationStrategy(userId);
+                await client.TrackAsync(strategy);
+                var address = (await client.GetUnusedAsync(strategy, DerivationFeature.Deposit)).Address;
+                return (true, address.ToString());
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+
+        public async Task<(bool success, WalletBalance response)> GetWalletBalance(string userId)
+        {
+            try
+            {
+                var client = CreateNBXplorerClient(_network);
+                var strategy = await GetDerivationStrategy(userId);
+                var userBalance = await client.GetBalanceAsync(strategy);
+                var balanceResponse = new WalletBalance
+                {
+                    Available = userBalance.Available.ToString(),
+                    Confirmed = userBalance.Confirmed.ToString(),
+                    Unconfirmed = userBalance.Unconfirmed.ToString(),
+                    Total = userBalance.Total.ToString(),
+                    Immature = userBalance.Immature.ToString()
+                };
+                return (true, balanceResponse);
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+
+
+        public async Task<(bool success, string message)> DescriptorWallet(string userid, string recipient)
+        {
+            try
+            {
+                // Connect to the Bitcoin Core node using RPC
+                var rpc = new RPCClient(new NetworkCredential("<rpcuser>", "<rpcpassword>"), new Uri("http://localhost:8332/"));
+                // Get the public keys for the cosigners
+                var cosignerOne = new PubKey("...");
+                var cosignerTwo = new PubKey("...");
+
+                var client = CreateNBXplorerClient(_network); // Connect to your NBXplorer instance
+               
+                var cosigners = new List<PubKey>
+                {
+                    cosignerOne,
+                    cosignerTwo,
+                };
+                // Create an output descriptor object that describes the multisig wallet
+                var descriptor = OutputDescriptor.NewMulti(2, (IEnumerable<PubKeyProvider>)cosigners, true, _network);
+
+                var wallet = client;
+                // Create a new WalletClient
+                /*var depositAddress = await client.GetUnusedAsync();
+
+                var utxos = await client.GetUTXOsAsync()
+
+                    // Create a new PSBTBuilder
+                var psbtBuilder = new PSBTBuilder(Network.Main);
+
+                // Add the output descriptor to the PSBT
+                psbtBuilder.AddOutputs(outputDescriptor);*/
+                return (true, "done");
+            }
+            catch (Exception ex)
+            {
+
+                throw ex;
+            }
+        }
         public async Task<(bool success, string message)> CreatePSBT(string userid, string recipient)
         {
             try
@@ -207,46 +368,6 @@ namespace Comgo.Infrastructure.Services
                 // Broadcast the signed transaction to the blockchain
                 await client.BroadcastAsync(signedTransaction);
                 return (true, "transaction broadcasted successfully");
-            }
-            catch (Exception ex)
-            {
-                throw ex;
-            }
-        }
-
-
-        public async Task<(bool success, string message)> GenerateAddress(string userId)
-        {
-            try
-            {
-                var client = CreateNBXplorerClient(_network);
-                var strategy = await GetDerivationStrategy(userId);
-                await client.TrackAsync(strategy);
-                var address = (await client.GetUnusedAsync(strategy, DerivationFeature.Deposit)).Address;
-                return (true, address.ToString());
-            }
-            catch (Exception ex)
-            {
-                throw ex;
-            }
-        }
-
-        public async Task<(bool success, WalletBalance response)> GetWalletBalance(string userId)
-        {
-            try
-            {
-                var client = CreateNBXplorerClient(_network);
-                var strategy = await GetDerivationStrategy(userId);
-                var userBalance = await client.GetBalanceAsync(strategy);
-                var balanceResponse = new WalletBalance
-                {
-                    Available = userBalance.Available.ToString(),
-                    Confirmed = userBalance.Confirmed.ToString(),
-                    Unconfirmed = userBalance.Unconfirmed.ToString(),
-                    Total = userBalance.Total.ToString(),
-                    Immature = userBalance.Immature.ToString()
-                };
-                return (true, balanceResponse);
             }
             catch (Exception ex)
             {

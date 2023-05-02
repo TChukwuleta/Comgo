@@ -1,17 +1,14 @@
 ﻿using MimeKit;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Comgo.Application.Common.Interfaces
 {
     public interface IEmailService
     {
+        Task<bool> SendEmailAsync(string email, string subject, string htmlMessage);
         Task<bool> SendRegistrationEmailToUser(string Email, string message);
         Task<bool> SendConfirmationEmailToUser(string email, string firstname, string reference, string message);
         Task<bool> SendEmailMessage(string body, string subject, string recipient);
+
         void SendEmail(Message message);
     }
 

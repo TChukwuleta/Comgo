@@ -45,7 +45,8 @@ namespace Comgo.Application.Transactions.Commands
                     PaymentModeType = request.PaymentMode,
                     TransactionStatus = TransactionStatus.Initiated,
                     Narration = request.Description,
-                    CreatedDate = DateTime.Now
+                    CreatedDate = DateTime.Now,
+                    Status = Status.Active
                 };
                 await _context.Transactions.AddAsync(entity);
                 await _context.SaveChangesAsync(cancellationToken);

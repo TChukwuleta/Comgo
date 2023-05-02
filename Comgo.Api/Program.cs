@@ -53,7 +53,6 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-string connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 builder.Services.AddCors(option => option.AddPolicy("CorsApp", builder =>

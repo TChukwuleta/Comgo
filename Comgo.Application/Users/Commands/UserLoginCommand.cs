@@ -36,7 +36,7 @@ namespace Comgo.Application.Users.Commands
                 {
                     return Result.Failure($"User login was not successful.");
                 }
-                var createCustody = await _bitcoinService.CreateNewKeyPair(userLogin.UserId, request.Password);
+                var createCustody = await _bitcoinService.CreateNewKeyPairAsync(userLogin.UserId);
                 var response = new
                 {
                     LoginDetails = userLogin,
