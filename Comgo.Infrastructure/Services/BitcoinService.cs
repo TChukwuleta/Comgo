@@ -1,7 +1,9 @@
 ﻿using Comgo.Application.Common.Interfaces;
 using Comgo.Application.Common.Model;
 using Comgo.Application.Common.Model.Response;
+using Comgo.Application.Common.Model.Response.BitcoinCommandResponses;
 using Comgo.Core.Entities;
+using Comgo.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using NBitcoin;
@@ -24,16 +26,26 @@ namespace Comgo.Infrastructure.Services
         private readonly IAppDbContext _context;
         private readonly IEncryptionService _encryptionService;
         private readonly IAuthService _authService;
+        private readonly IBitcoinCoreClient _bitcoinCoreClient;
         private readonly Network _network;
+        private readonly string serverIp;
+        private readonly string username;
+        private readonly string password;
+        private readonly string walletname;
         public BitcoinService(IConfiguration config, IEmailService emailService, IAppDbContext context,
-            IEncryptionService encryptionService, IAuthService authService)
+            IEncryptionService encryptionService, IAuthService authService, IBitcoinCoreClient bitcoinCoreClient)
         {
             _config = config;
+            _bitcoinCoreClient = bitcoinCoreClient;
             _authService = authService;
             _encryptionService = encryptionService;
             _emailService = emailService;
             _context = context;
             _network = Network.RegTest;
+            serverIp = _config["Bitcoin:URL"];
+            username = _config["Bitcoin:username"];
+            password = _config["Bitcoin:password"];
+            walletname = _config["Bitcoin:wallet"];
         }
 
         public async Task<(bool success, string message)> ConfirmUserTransaction(string userId, string reference)
@@ -70,70 +82,6 @@ namespace Comgo.Infrastructure.Services
             }
         }
 
-
-        public async Task<(bool success, string message, KeyPairResponse entity)> CreateNewKeyPair(string userId, string password)
-        {
-            try
-            {
-                // This happens for every user login.
-                // Check that the user has his/her public key existing
-                // If the user does not exist, create a new one
-                var existingSignature = await _context.Signatures.FirstOrDefaultAsync(c => c.UserId == userId);
-                if (existingSignature != null)
-                {
-                    return (true, "User keys already exist", null);
-                }
-                var superAdmin = await _authService.GetSuperAdmin(userId);
-                superAdmin.user.UserCount += 1;
-
-                var userKey = new Party(new Mnemonic(Wordlist.English), password, new KeyPath($"5'/2'/{superAdmin.user.UserCount}"));
-                
-                // Get the extkey
-                var rootKey = userKey.RootExtKey.ToBytes();
-                var rootExtKey = Encoding.ASCII.GetString(rootKey);
-
-                /*var testBytes = Encoding.ASCII.GetBytes(rootExtKey);
-                var newKeey = ExtKey.CreateFromBytes(testBytes);
-                var anotherg = ExtKey.CreateFromBytes(rootKey);*/
-
-                // Get ext pubkey
-                var userPubKey = userKey.AccountExtPubKey.GetWif(_network);
-                 var userPublicKey = userPubKey.ToString();
-                var extPubKey = userKey.AccountExtPubKey.ToBytes();
-                var extendedPubKey = System.Text.Encoding.ASCII.GetString(extPubKey);
-                var newSafeDetails = new SaveDetails
-                {
-                    ExtKey = rootExtKey,
-                    KeyPath = userKey.AccountKeyPath.GetAccountKeyPath().ToStringWithEmptyKeyPathAware(),
-                    ExtPubKey = extendedPubKey,
-                    UserId = userId
-                };
-                var serializeDetails = JsonConvert.SerializeObject(newSafeDetails);
-
-                var newSignature = new Signature
-                {
-                    UserId = userId,
-                    UserPubKey = _encryptionService.EncryptData(userPublicKey),
-                    CreatedDate = DateTime.Now,
-                    Status = Core.Enums.Status.Active,
-                    UserSafeDetails = _encryptionService.EncryptData(serializeDetails)
-                };
-                await _context.Signatures.AddAsync(newSignature);
-                await _context.SaveChangesAsync(new CancellationToken());
-
-                var keyPairs = new KeyPairResponse
-                {
-                    Mnemonic = userKey.Mnemonic.ToString(),
-                    PublicKey = userPublicKey
-                };
-                return (true, "User keys created successfully", keyPairs);
-            }
-            catch (Exception ex)
-            {
-                throw ex;
-            }
-        }
-
         public async Task<(bool success, string message, KeyPairResponse entity)> CreateNewKeyPairAsync(string userId)
         {
             try
@@ -157,18 +105,15 @@ namespace Comgo.Infrastructure.Services
                     adminPubkey,
                     userPubkey,
                 };
-
                 // Convert the list of PubKey objects to a list of PubKeyProvider objects
-                List<PubKeyProvider> pubKeysProvider = new List<PubKeyProvider>();
+                List<PubKeyProvider> pubKeysProvider = new();
                 foreach (var cosigner in cosigners)
                 {
                     var provider = PubKeyProvider.NewConst(cosigner);
                     pubKeysProvider.Add(provider);
                 }
-
                 // Create an output descriptor object that describes the multisig wallet
                 var descriptor = OutputDescriptor.NewMulti(2, pubKeysProvider, true, _network);
-
                 var newSignature = new Signature
                 {
                     UserId = userId,
@@ -177,11 +122,9 @@ namespace Comgo.Infrastructure.Services
                     CreatedDate = DateTime.Now,
                     Status = Core.Enums.Status.Active,
                     UserSafeDetails = descriptor.ToString(),
-
                 };
                 await _context.Signatures.AddAsync(newSignature);
                 await _context.SaveChangesAsync(new CancellationToken());
-
                 var keyPairs = new KeyPairResponse
                 {
                     PrivateKey = userKey.GetWif(_network).ToString(),
@@ -201,9 +144,22 @@ namespace Comgo.Infrastructure.Services
             {
                 var signature = await _context.Signatures.FirstOrDefaultAsync(c => c.UserId == userId);
                 var descriptor = OutputDescriptor.Parse(signature.UserSafeDetails, _network);
-
-
-                return (true, "Ayo".ToString());
+                if (descriptor == null)
+                {
+                    return (false, "Invalid user details");
+                }
+                var outputDescriptor = OutputDescriptor.NewWSH(descriptor, _network);
+                var generateAddress = await _bitcoinCoreClient.BitcoinRequestServer(walletname, Core.Enums.RPCOperations.deriveaddresses.ToString(), outputDescriptor.ToString());
+                var getAddress = JsonConvert.DeserializeObject<GenericListResponse>(generateAddress);
+                if (getAddress == null)
+                {
+                    return (false, "An error occured while retrieving address for descriptor");
+                }
+                if (!string.IsNullOrEmpty(getAddress.error))
+                {
+                    return (false, getAddress.error);
+                }
+                return (true, getAddress.result.FirstOrDefault());
             }
             catch (Exception ex)
             {
@@ -251,45 +207,6 @@ namespace Comgo.Infrastructure.Services
         }
 
 
-        public async Task<(bool success, string message)> DescriptorWallet(string userid, string recipient)
-        {
-            try
-            {
-                // Connect to the Bitcoin Core node using RPC
-                var rpc = new RPCClient(new NetworkCredential("<rpcuser>", "<rpcpassword>"), new Uri("http://localhost:8332/"));
-                // Get the public keys for the cosigners
-                var cosignerOne = new PubKey("...");
-                var cosignerTwo = new PubKey("...");
-
-                var client = CreateNBXplorerClient(_network); // Connect to your NBXplorer instance
-               
-                var cosigners = new List<PubKey>
-                {
-                    cosignerOne,
-                    cosignerTwo,
-                };
-                // Create an output descriptor object that describes the multisig wallet
-                var descriptor = OutputDescriptor.NewMulti(2, (IEnumerable<PubKeyProvider>)cosigners, true, _network);
-
-                var wallet = client;
-                // Create a new WalletClient
-                /*var depositAddress = await client.GetUnusedAsync();
-
-                var utxos = await client.GetUTXOsAsync()
-
-                    // Create a new PSBTBuilder
-                var psbtBuilder = new PSBTBuilder(Network.Main);
-
-                // Add the output descriptor to the PSBT
-                psbtBuilder.AddOutputs(outputDescriptor);*/
-                return (true, "done");
-            }
-            catch (Exception ex)
-            {
-
-                throw ex;
-            }
-        }
         public async Task<(bool success, string message)> CreatePSBT(string userid, string recipient)
         {
             try
@@ -622,6 +539,25 @@ namespace Comgo.Infrastructure.Services
             {
                 throw ex;
             }
+        }
+
+        private async Task<RPCClient> CreateRpcClient()
+        {
+            try
+            {
+                var credential = new NetworkCredential
+                {
+                    UserName = username,
+                    Password = password
+                };
+                var rpc = new RPCClient(credential, $"{serverIp}/wallet/{walletname}", _network);
+                return rpc;
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+
         }
     }
 }

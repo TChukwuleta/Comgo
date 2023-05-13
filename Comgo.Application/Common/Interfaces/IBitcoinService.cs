@@ -17,7 +17,6 @@ namespace Comgo.Application.Common.Interfaces
         Task<(bool success, string message)> ListTransactions(string userid);
         Task<(bool success, string message)> SendToAddress(string address, string amountBtc);
         Task<(bool success, WalletBalance response)> GetWalletBalance(string userId);
-        Task<(bool success, string message, KeyPairResponse entity)> CreateNewKeyPair(string userId, string password);
         Task<(bool success, string message, KeyPairResponse entity)> CreateNewKeyPairAsync(string userId);
         Task<Transaction> SignSignature(BitcoinAddress recipientAddress, Money amount, ScriptCoin coin, Money minerFee, BitcoinAddress changeAddress, PubKey userKey, PubKey systemKey);
         Task<(bool success, string message)> ConfirmUserTransaction(string userId, string reference);

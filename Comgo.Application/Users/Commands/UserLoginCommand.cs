@@ -1,13 +1,7 @@
 ﻿using Comgo.Application.Common.Interfaces;
 using Comgo.Application.Common.Interfaces.Validators.UserValidator;
-using Comgo.Core.Entities;
 using Comgo.Core.Model;
 using MediatR;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Comgo.Application.Users.Commands
 {

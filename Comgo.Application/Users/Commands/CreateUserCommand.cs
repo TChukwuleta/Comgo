@@ -46,7 +46,7 @@ namespace Comgo.Application.Users.Commands
                 var existingUser = allUsers.users.FirstOrDefault(c => c.Name.ToLower() == request.Name.ToLower());
                 if (existingUser != null)
                 {
-                    return Result.Failure("User already exist with this detail");
+                    return Result.Failure("Kindly use a different name as a user with this name already exist");
                 }
                 var newUser = new User
                 {

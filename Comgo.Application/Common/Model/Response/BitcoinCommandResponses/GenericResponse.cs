@@ -12,4 +12,11 @@ namespace Comgo.Application.Common.Model.Response.BitcoinCommandResponses
         public string error { get; set; }
         public string id { get; set; }
     }
+
+    public class GenericListResponse
+    {
+        public List<string> result { get; set; }
+        public string error { get; set; }
+        public string id { get; set; }
+    }
 }
