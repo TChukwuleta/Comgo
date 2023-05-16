@@ -82,7 +82,7 @@ namespace Comgo.Infrastructure.Services
             }
         }
 
-        public async Task<(bool success, string message, KeyPairResponse entity)> CreateNewKeyPairAsync(string userId)
+        public async Task<(bool success, string message, KeyPairResponse entity)> CreateNewKeyPairAsync(string userId, string publicKey)
         {
             try
             {
@@ -91,21 +91,24 @@ namespace Comgo.Infrastructure.Services
                 {
                     return (true, "User keys already exist", null);
                 }
+                if (string.IsNullOrEmpty(publicKey))
+                {
+                    return (false, "Public key must be provided", null);
+                }
                 var superAdmin = await _authService.GetSuperAdmin(userId);
-                // Generate key for user
-                var userKey = new Key();
-                var userPubkey = userKey.PubKey;
 
-                // Generate key for admin
-                var adminKey = new Key();
-                var adminPubkey = adminKey.PubKey;
+                var userPubkey = new PubKey(publicKey);
+                if (userPubkey == null)
+                {
+                    return (false, "Invalid public key", null);
+                }
+                var adminPubkey = new PubKey(_config["AdminPubKey"]);
 
                 var cosigners = new List<PubKey>
                 {
                     adminPubkey,
                     userPubkey,
                 };
-                // Convert the list of PubKey objects to a list of PubKeyProvider objects
                 List<PubKeyProvider> pubKeysProvider = new();
                 foreach (var cosigner in cosigners)
                 {
@@ -120,14 +123,13 @@ namespace Comgo.Infrastructure.Services
                     UserPubKey = _encryptionService.EncryptData(userPubkey.ToHex()),
                     AdminPubKey = _encryptionService.EncryptData(adminPubkey.ToHex()),
                     CreatedDate = DateTime.Now,
-                    Status = Core.Enums.Status.Active,
+                    Status = Status.Active,
                     UserSafeDetails = descriptor.ToString(),
                 };
                 await _context.Signatures.AddAsync(newSignature);
                 await _context.SaveChangesAsync(new CancellationToken());
                 var keyPairs = new KeyPairResponse
                 {
-                    PrivateKey = userKey.GetWif(_network).ToString(),
                     PublicKey = userPubkey.ToHex()
                 };
                 return (true, "User keys created successfully", keyPairs);
@@ -137,6 +139,7 @@ namespace Comgo.Infrastructure.Services
                 throw ex;
             }
         }
+
 
         public async Task<(bool success, string message)> GenerateAddress(string userId)
         {
@@ -166,6 +169,210 @@ namespace Comgo.Infrastructure.Services
                 throw ex;
             }
         }
+
+        public async Task<(bool success, string message, decimal amount)> GetDescriptorBalance(string userId)
+        {
+            try
+            {
+                var signature = await _context.Signatures.FirstOrDefaultAsync(c => c.UserId == userId);
+                var descriptor = OutputDescriptor.Parse(signature.UserSafeDetails, _network);
+                if (descriptor == null)
+                {
+                    return (false, "Invalid user details", 0);
+                }
+                var outputDescriptor = OutputDescriptor.NewWSH(descriptor, _network);
+                var rpc = await CreateRpcClient();
+                // Get all unspent transactions
+                var outputDescriptors = new ScanTxoutDescriptor(outputDescriptor);
+                ScanTxoutSetParameters scanner = new ScanTxoutSetParameters(outputDescriptor);
+                var result = rpc.StartScanTxoutSet(scanner);
+                if (!result.Success)
+                {
+                    return (false, "Unable to retrieve unspent output from descriptor", 0);
+                }
+                return (true, "Descriptor balance retrieved successfully", result.TotalAmount.ToDecimal(MoneyUnit.Satoshi));
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+
+        public async Task<(bool success, string message)> CreatePSBTAsync(string userId, string destinationAddress, decimal amount)
+        {
+            try
+            {
+                // Retrieve the output descriptor pertaining that user
+                var signature = await _context.Signatures.FirstOrDefaultAsync(c => c.UserId == userId);
+                var descriptor = OutputDescriptor.Parse(signature.UserSafeDetails, _network);
+                if (descriptor == null)
+                {
+                    return (false, "Invalid user details");
+                }
+                var outputDescriptor = OutputDescriptor.NewWSH(descriptor, _network);
+                var amountToSend = Money.Satoshis(amount);
+                var recipient = BitcoinAddress.Create(destinationAddress, _network);
+                if (recipient == null)
+                {
+                    return (false, "Invalid destination address");
+                }
+                var desiredOutputs = new[]
+                {
+                    new TxOut(amountToSend, recipient),
+                };
+                var generateAddress = await _bitcoinCoreClient.BitcoinRequestServer(walletname, Core.Enums.RPCOperations.deriveaddresses.ToString(), outputDescriptor.ToString());
+                var getAddress = JsonConvert.DeserializeObject<GenericListResponse>(generateAddress);
+                if (getAddress == null)
+                {
+                    return (false, "An error occured while retrieving address for descriptor");
+                }
+                if (!string.IsNullOrEmpty(getAddress.error))
+                {
+                    return (false, "An error occured while trying to generate change address");
+                }
+                var changeAddress = BitcoinAddress.Create(getAddress.result.FirstOrDefault(), _network);
+                
+                var rpc = await CreateRpcClient();
+                // Get all unspent transactions
+                var outputDescriptors = new ScanTxoutDescriptor(descriptor);
+                ScanTxoutSetParameters scanner = new ScanTxoutSetParameters(outputDescriptor);
+                var result = await rpc.StartScanTxoutSetAsync(scanner);
+                if (!result.Success)
+                {
+                    return (false, "Unable to retrieve unspent output from descriptor");
+                }
+                if (result.TotalAmount.Satoshi <= amount)
+                {
+                    return (false, "Insufficient funds");
+                }
+
+                var outt = result.Outputs;
+                // coin selection
+                Array.Sort(result.Outputs, (a, b) => -a.Coin.Amount.CompareTo(b.Coin.Amount));
+                var totalOutputAmount = desiredOutputs.Sum(output => output.Value);
+                var selectedCoins = new List<Coin>();
+                var totalSelectedAmount = 0L;
+                var selectedOutpoints = new List<ScanTxoutOutput>();
+
+                foreach (var coin in result.Outputs)
+                {
+                    if (totalSelectedAmount > totalOutputAmount)
+                        break;
+                    selectedOutpoints.Add(coin);
+                    selectedCoins.Add(coin.Coin);
+                    totalSelectedAmount += coin.Coin.Amount;
+                }
+
+
+                //bitcoin-cli walletcreatefundedpsbt "[{\"txid\":\"myid\",\"vout\":0}]" "[{\"data\":\"00010203\"}]"
+                // Inputs
+                var inputOption = new List<Dictionary<string, object>>();
+                foreach (var input in selectedOutpoints)
+                {
+                    inputOption.Add(new Dictionary<string, object>
+                    {
+                        { "txid", input.Coin.Outpoint.Hash.ToString() },
+                        { "vout", input.Coin.Outpoint.N }
+                    });
+                }
+
+                var outputOption = new List<Dictionary<string, object>>();
+                foreach (var input in selectedOutpoints)
+                {
+                    outputOption.Add(new Dictionary<string, object>
+                    {
+                        //{ "data", "49879816ffbca992d07559d56c0cb8cbc14aa7eb896bc79f532d272595b5906f" }
+                        { destinationAddress, amountToSend.ToString() }
+                    });
+                }
+
+                //var sendErrand = await _bitcoinCoreClient.BitcoinRequestServer(walletname, "walletcreatefundedpsbt", JsonConvert.SerializeObject(inputOption), JsonConvert.SerializeObject(outputOption));
+
+
+                TxIn[] txIns = new TxIn[result.Outputs.Length];
+                for (int i = 0; i < result.Outputs.Length; i++)
+                {
+                    txIns[i] = new TxIn( new OutPoint(result.Outputs[i].Coin.Outpoint.Hash, result.Outputs[i].Coin.Outpoint.N));
+                }
+                var outputs = new Dictionary<BitcoinAddress, Money>
+                {
+                    { recipient, amountToSend }
+                };
+
+                Dictionary<string, string> options = new Dictionary<string, string>
+                {
+                    { "subtractFeeFromOutputs", "1" }
+                };
+
+/*
+                // Create a list of inputs.
+                var inputs = new List<Input>();
+                inputs.Add(new Input
+                {
+                    Txid = "1234567890abcdef",
+                    Vout = 0
+                });
+
+                // Create a list of outputs.
+                var outputs = new List<Output>();
+                outputs.Add(new Output
+                {
+                    Address = "1234567890abcdef1234567890abcdef1234567890abcdef",
+                    Amount = 0.1
+                });
+
+                // Create a PSBT.*/
+                //var psbt = await rpc.WalletCreateFundedPSBTAsync(inputs, outputs);
+
+                var walletTuple = new Tuple<Dictionary<BitcoinAddress, Money>, Dictionary<string, string>>(outputs, options);
+                var response = await rpc.WalletCreateFundedPSBTAsync(txIns, walletTuple);
+
+                List<ICoin> iCoinList = new List<ICoin>();
+                foreach (Coin coin in selectedCoins)
+                {
+                    ICoin iCoin = coin; // Convert each Coin to ICoin
+                    iCoinList.Add(iCoin);
+                }
+                // Create a PSBT with the input and output information
+                var builder = _network.CreateTransactionBuilder();
+                builder.AddCoins(iCoinList); // Convert Coin to ICoin
+                builder.Send(recipient, amountToSend);
+                builder.SetChange(changeAddress);
+                // Set the fee
+                var feeRate = new FeeRate(Money.Satoshis(10), 1); // Fee rate in satoshis per byte
+                builder.SendEstimatedFees(feeRate);
+                var psbt = builder.BuildPSBT(true);
+                Console.WriteLine(psbt.ToHex());
+                /*//builder.AddKeys(publicKeys);
+                var finalize = psbt.Finalize();
+                // Finalize the PSBT
+                var finalizedTx = psbt.ExtractTransaction();
+                // Print the finalized transaction
+                Console.WriteLine(finalizedTx.ToHex());
+                rpc.SendRawTransaction(finalizedTx);*/
+                return (true, psbt.ToHex());
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+
+        public async Task<(bool success, string message)> SignPSBTAsync(string userId, string psbt)
+        {
+            try
+            {
+                var rpc = await CreateRpcClient();
+                var partialSignedTransaction = PSBT.TryParse(psbt, _network, out PSBT userSignedPSBT);
+                var doSth = await rpc.WalletProcessPSBTAsync(userSignedPSBT);
+                return (true, "Idan");
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+
 
         public async Task<(bool success, string message)> GenerateAddressAsync(string userId)
         {
@@ -328,141 +535,6 @@ namespace Comgo.Infrastructure.Services
             }
         }
 
-
-        public Task<(bool success, string message)> TransactionLookOut()
-        {
-            throw new NotImplementedException();
-        }
-
-
-        
-        // Still working on this. Refactoring to fit in NBXplorer
-        public async Task<(bool success, string message)> CreateMultisigTransaction(string userid, string recipient)
-        {
-            var client = new QBitNinjaClient(_network);
-            try
-            {
-                // Get public key for both user and admin
-                var superAdmin = await _authService.GetSuperAdmin(userid);
-                var systemPair = await _context.Signatures.FirstOrDefaultAsync(c => c.UserId == superAdmin.user.UserId);
-                if (systemPair == null)
-                {
-                    return (false, "An error occured while retrieving system user key details. Kindly contact support");
-                }
-                var userPair = await _context.Signatures.FirstOrDefaultAsync(c => c.UserId == userid);
-                if (userPair == null)
-                {
-                    return (false, "An error occured while retrieving user key details. Kindly contact support");
-                }
-                var decryptedUserPubKey = _encryptionService.DecryptData(userPair.UserPubKey);
-                var decryptedAdminPubKey = _encryptionService.DecryptData(systemPair.UserPubKey);
-                /*var userPublicKey = new PubKey(Encoding.ASCII.GetBytes(decryptedUserPubKey));
-                var systemPublicKey = new PubKey(Encoding.ASCII.GetBytes(decryptedAdminPubKey));*/
-                var userPubKey = new BitcoinExtPubKey(decryptedUserPubKey, _network).ToWif();
-                var systemPubKey = new BitcoinExtPubKey(decryptedAdminPubKey, _network).ToWif();
-
-                var userPublicKey = new PubKey(userPubKey);
-                var systemPublicKey = new PubKey(systemPubKey);
-
-                // Get the redeem script and addresses
-                var scriptPubKey = PayToMultiSigTemplate
-                    .Instance
-                    .GenerateScriptPubKey(2, new[] { userPublicKey, systemPublicKey });
-                Console.Write("Public script: " + scriptPubKey);
-                Console.Write("Redeem script: " + scriptPubKey.PaymentScript);
-
-                var lucasAddress = BitcoinAddress.Create(recipient, _network);
-                var changeAddress = scriptPubKey.PaymentScript.Hash.GetAddress(_network);
-
-
-                var receiveTransactionId = uint256.Parse("0acb6e97b228b838049ffbd528571c5e3edd003f0ca8ef61940166dc3081b78a");
-                var receiveTransactionResponse = client.GetTransaction(receiveTransactionId).Result;
-                Console.WriteLine(receiveTransactionResponse.TransactionId);
-                // if this fails, it's ok. It hasn't been confirmed in a block yet. Proceed
-                Console.WriteLine(receiveTransactionResponse.Block.Confirmations);
-                var receivedCoins = receiveTransactionResponse.ReceivedCoins;
-                OutPoint outpointToSpend = null;
-                ScriptCoin coinToSpend = null;
-                foreach (var c in receivedCoins)
-                {
-                    try
-                    {
-                        // If we can make a ScriptCoin out of our redeemScript
-                        // we "own" this outpoint
-                        coinToSpend = new ScriptCoin(c, scriptPubKey.PaymentScript);
-                        outpointToSpend = c.Outpoint;
-                    }
-                    catch { }
-                }
-                if (outpointToSpend == null)
-                    throw new Exception("TxOut doesn't contain any our ScriptPubKey");
-                Console.WriteLine("We want to spend outpoint #{0}", outpointToSpend.N + 1);
-                var minerFee = new Money(0.0002m, MoneyUnit.BTC);
-                var txInAmount = (Money)receivedCoins[(int)outpointToSpend.N].Amount;
-                var sendAmount = txInAmount - minerFee;
-
-                // Sign transactions with pub key
-                var signedTransaction = await SignSignature(lucasAddress, sendAmount, coinToSpend, minerFee, changeAddress, userPublicKey, systemPublicKey);
-
-                // Broadcast signed transactions
-                var broadcastResponse = client.Broadcast(signedTransaction).Result;
-                if (!broadcastResponse.Success)
-                {
-                    throw new ArgumentException($"Threw error with code: {broadcastResponse.Error.ErrorCode}, and message: {broadcastResponse.Error.Reason}");
-                }
-                return (true, $"Success! You can check out the hash of the transaciton in any block explorer: {signedTransaction.GetHash().ToString()}");
-            }
-            catch (Exception ex)
-            {
-
-                throw ex;
-            }
-        }
-
-        // Going to derive a new method
-        public async Task<NBitcoin.Transaction> SignSignature(BitcoinAddress recipientAddress, Money amount, ScriptCoin coin, Money minerFee, BitcoinAddress changeAddress, PubKey userKey, PubKey systemKey)
-        {
-            var builder = _network.CreateTransactionBuilder();
-            try
-            {
-                var pub = new ExtPubKey("bla");
-                var unsignedTransaction = builder
-                    .AddCoin(coin)
-                    .Send(recipientAddress, amount)
-                    .SendFees(minerFee)
-                    .SetChange(changeAddress)
-                    .BuildTransaction(sign: false);
-
-                var systemSignature = builder
-                    .AddCoin(coin)
-                    .AddKeys((ISecret)systemKey)
-                    .SignTransaction(unsignedTransaction);
-
-                var userSignature = builder
-                    .AddCoin(coin)
-                    .AddKeys((ISecret)userKey)
-                    .SignTransaction(systemSignature);
-
-                var fullySignedTransaction = builder
-                    .AddCoins(coin)
-                    .CombineSignatures(systemSignature, userSignature);
-
-                Console.WriteLine(fullySignedTransaction);
-                if (fullySignedTransaction == null)
-                {
-                    throw new ArgumentException("An error occured while trying to sign transactions.");
-                }
-                return fullySignedTransaction;
-            }
-            catch (Exception ex)
-            {
-                throw ex;
-            }
-        }
-
-        
-
-
         // This method creates client connection to NBXplorer
         private static ExplorerClient CreateNBXplorerClient(Network network)
         {
@@ -541,6 +613,26 @@ namespace Comgo.Infrastructure.Services
             }
         }
 
+        private async Task<RPCClient> CreateRpcClientCommand()
+        {
+            try
+            {
+                var credential = new NetworkCredential
+                {
+                    UserName = username,
+                    Password = password
+                };
+                var rpc = new RPCClient(credential, $"{serverIp}/wallet/{walletname}", _network);
+                return rpc;
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+
+
+
         private async Task<RPCClient> CreateRpcClient()
         {
             try
@@ -557,7 +649,6 @@ namespace Comgo.Infrastructure.Services
             {
                 throw ex;
             }
-
         }
     }
 }

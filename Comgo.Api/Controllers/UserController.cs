@@ -40,6 +40,20 @@ namespace Comgo.Api.Controllers
             }
         }
 
+        [HttpPost("createpsbt")]
+        public async Task<ActionResult<Result>> CreatePSBT(CreateUserPSBTCommand command)
+        {
+            try
+            {
+                accessToken.ValidateToken(command.UserId);
+                return await _mediator.Send(command);
+            }
+            catch (Exception ex)
+            {
+                return Result.Failure($"Failed to create PSBT. Error: {ex?.Message ?? ex?.InnerException?.Message}");
+            }
+        }
+
         [HttpPost("validateandmakepayment")]
         public async Task<ActionResult<Result>> ValidateAndMakePayment(ValidatePaymentCommand command)
         {

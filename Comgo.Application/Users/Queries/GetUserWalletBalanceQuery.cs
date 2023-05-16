@@ -29,12 +29,12 @@ namespace Comgo.Application.Users.Queries
                 {
                     return Result.Failure("No user found");
                 }
-                var generatedAddress = await _bitcoinService.GetWalletBalance(request.UserId);
+                var generatedAddress = await _bitcoinService.GetDescriptorBalance(request.UserId);
                 if (!generatedAddress.success)
                 {
                     return Result.Failure("An error occured while trying to retrieve user balance. Please contact support");
                 }
-                return Result.Success("User wallet balance retrieved successfully", generatedAddress.response);
+                return Result.Success("User wallet balance retrieved successfully", generatedAddress.amount);
             }
             catch (Exception ex)
             {

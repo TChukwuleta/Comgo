@@ -4,13 +4,8 @@ using Microsoft.Extensions.Configuration;
 using NBitcoin;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
-using System.Reflection;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace Comgo.Infrastructure.Services
 {
@@ -168,6 +163,50 @@ namespace Comgo.Infrastructure.Services
                 joe.Add(new JProperty("method", methodName));
                 JArray props = new JArray();
                 props.Add(parameters);
+                joe.Add(new JProperty("params", props));
+                // Serialize json for request
+                string s = JsonConvert.SerializeObject(joe);
+                byte[] byteArray = Encoding.UTF8.GetBytes(s);
+                webRequest.ContentLength = byteArray.Length;
+                Stream dataStream = webRequest.GetRequestStream();
+                dataStream.Write(byteArray, 0, byteArray.Length);
+                dataStream.Close();
+                // Deserialize the response
+                StreamReader streamReader = null;
+                WebResponse webResponse = webRequest.GetResponse();
+                streamReader = new StreamReader(webResponse.GetResponseStream(), true);
+                responseValue = streamReader.ReadToEnd();
+                var data = JsonConvert.DeserializeObject(responseValue).ToString();
+                return data;
+            }
+            catch (Exception ex)
+            {
+
+                throw ex;
+            }
+        }
+
+        public async Task<string> BitcoinRequestServer(string walletname, string methodName, string parameterOne, string parameterTwo)
+        {
+            try
+            {
+                var url = serverIp;
+                if (!string.IsNullOrEmpty(walletname))
+                {
+                    url = $"{url}/wallet/{walletname}";
+                }
+                HttpWebRequest webRequest = (HttpWebRequest)WebRequest.Create(url);
+                webRequest.Credentials = new NetworkCredential(username, password);
+                webRequest.ContentType = "application/json-rpc";
+                webRequest.Method = "POST";
+                string responseValue = string.Empty;
+                JObject joe = new JObject();
+                joe.Add(new JProperty("jsonrpc", "1.0"));
+                joe.Add(new JProperty("id", "curltext"));
+                joe.Add(new JProperty("method", methodName));
+                JArray props = new JArray();
+                props.Add(parameterOne);
+                props.Add(parameterTwo);
                 joe.Add(new JProperty("params", props));
                 // Serialize json for request
                 string s = JsonConvert.SerializeObject(joe);

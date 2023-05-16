@@ -17,5 +17,6 @@ namespace Comgo.Application.Common.Interfaces
         Task<string> BitcoinRequestServer(string methodName, string parameters, int value);
         Task<string> BitcoinRequestServer(string methodName);
         Task<string> WalletInformation(string walletname, string methodname);
+        Task<string> BitcoinRequestServer(string walletname, string methodName, string parameterOne, string parameterTwo);
     }
 }
