@@ -237,6 +237,10 @@ namespace Comgo.Infrastructure.Services
         {
             try
             {
+                var selectedCoins = new List<Coin>();
+                var totalSelectedAmount = 0L;
+                var selectedOutpoints = new List<ScanTxoutOutput>();
+                var transaction = _network.CreateTransaction();
                 // Retrieve the output descriptor pertaining that user
                 var signature = await _context.Signatures.FirstOrDefaultAsync(c => c.UserId == userId);
                 var descriptor = OutputDescriptor.Parse(signature.UserSafeDetails, _network);
@@ -285,9 +289,6 @@ namespace Comgo.Infrastructure.Services
                 // coin selection
                 Array.Sort(result.Outputs, (a, b) => -a.Coin.Amount.CompareTo(b.Coin.Amount));
                 var totalOutputAmount = desiredOutputs.Sum(output => output.Value);
-                var selectedCoins = new List<Coin>();
-                var totalSelectedAmount = 0L;
-                var selectedOutpoints = new List<ScanTxoutOutput>();
 
                 foreach (var coin in result.Outputs)
                 {
@@ -297,13 +298,11 @@ namespace Comgo.Infrastructure.Services
                     selectedCoins.Add(coin.Coin);
                     totalSelectedAmount += coin.Coin.Amount;
                 }
-
-
-                //bitcoin-cli walletcreatefundedpsbt "[{\"txid\":\"myid\",\"vout\":0}]" "[{\"data\":\"00010203\"}]"
                 // Inputs
                 var inputOption = new List<Dictionary<string, object>>();
                 foreach (var input in selectedOutpoints)
                 {
+                    transaction.Inputs.Add(new TxIn(new OutPoint(input.Coin.Outpoint.Hash, input.Coin.Outpoint.N)));
                     inputOption.Add(new Dictionary<string, object>
                     {
                         { "txid", input.Coin.Outpoint.Hash.ToString() },
@@ -316,11 +315,9 @@ namespace Comgo.Infrastructure.Services
                 {
                     outputOption.Add(new Dictionary<string, object>
                     {
-                        //{ "data", "49879816ffbca992d07559d56c0cb8cbc14aa7eb896bc79f532d272595b5906f" }
                         { destinationAddress, amountToSend.ToString() }
                     });
                 }
-
                 //var sendErrand = await _bitcoinCoreClient.BitcoinRequestServer(walletname, "walletcreatefundedpsbt", JsonConvert.SerializeObject(inputOption), JsonConvert.SerializeObject(outputOption));
 
 
@@ -339,28 +336,9 @@ namespace Comgo.Infrastructure.Services
                     { "subtractFeeFromOutputs", "1" }
                 };
 
-/*
-                // Create a list of inputs.
-                var inputs = new List<Input>();
-                inputs.Add(new Input
-                {
-                    Txid = "1234567890abcdef",
-                    Vout = 0
-                });
-
-                // Create a list of outputs.
-                var outputs = new List<Output>();
-                outputs.Add(new Output
-                {
-                    Address = "1234567890abcdef1234567890abcdef1234567890abcdef",
-                    Amount = 0.1
-                });
-
-                // Create a PSBT.*/
-                //var psbt = await rpc.WalletCreateFundedPSBTAsync(inputs, outputs);
 
                 var walletTuple = new Tuple<Dictionary<BitcoinAddress, Money>, Dictionary<string, string>>(outputs, options);
-                var response = await rpc.WalletCreateFundedPSBTAsync(txIns, walletTuple);
+                //var response = await rpc.WalletCreateFundedPSBTAsync(txIns, walletTuple);
 
                 List<ICoin> iCoinList = new List<ICoin>();
                 foreach (Coin coin in selectedCoins)
@@ -376,7 +354,12 @@ namespace Comgo.Infrastructure.Services
                 // Set the fee
                 var feeRate = new FeeRate(Money.Satoshis(10), 1); // Fee rate in satoshis per byte
                 builder.SendEstimatedFees(feeRate);
-                var psbt = builder.BuildPSBT(true);
+
+                transaction.Outputs.Add(new TxOut(amountToSend, recipient));
+                var change = Money.Satoshis(150);
+                transaction.Outputs.Add(new TxOut(change, changeAddress));
+                var psbt = builder.CreatePSBTFrom(transaction, false);
+
                 Console.WriteLine(psbt.ToHex());
                 /*//builder.AddKeys(publicKeys);
                 var finalize = psbt.Finalize();
