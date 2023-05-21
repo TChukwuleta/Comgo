@@ -13,7 +13,6 @@ using NBXplorer;
 using NBXplorer.DerivationStrategy;
 using NBXplorer.Models;
 using Newtonsoft.Json;
-using QBitNinja.Client;
 using System.Net;
 using System.Text;
 
@@ -75,6 +74,42 @@ namespace Comgo.Infrastructure.Services
                     throw new ArgumentException("An error occured while trying to confirm your transaction");
                 }
                 return (true, "An email has been sent to your mail. Kindly confirm by including the OTP");
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+
+        public async Task<(bool success, string message)> CreateDescriptorString(string pubkeyone, string pubkeytwo)
+        {
+            try
+            {
+                var userPubkey = new PubKey(pubkeyone);
+                if (userPubkey == null)
+                {
+                    return (false, "Invalid public key one");
+                }
+
+                var userPubkeTwo = new PubKey(pubkeytwo);
+                if (userPubkey == null)
+                {
+                    return (false, "Invalid public key two");
+                }
+                var cosigners = new List<PubKey>
+                {
+                    userPubkeTwo,
+                    userPubkey,
+                };
+                List<PubKeyProvider> pubKeysProvider = new();
+                foreach (var cosigner in cosigners)
+                {
+                    var provider = PubKeyProvider.NewConst(cosigner);
+                    pubKeysProvider.Add(provider);
+                }
+                var descriptor = OutputDescriptor.NewMulti(2, pubKeysProvider, true, _network);
+                var outputDescriptor = OutputDescriptor.NewWSH(descriptor, _network);
+                return (true, outputDescriptor.ToString());
             }
             catch (Exception ex)
             {

@@ -1,5 +1,6 @@
 ﻿using Comgo.Application.Lightnings.Commands;
 using Comgo.Application.Paystacks.Commands;
+using Comgo.Application.Users;
 using Comgo.Application.Users.Commands;
 using Comgo.Core.Model;
 using MediatR;
@@ -17,6 +18,18 @@ namespace Comgo.Api.Controllers
             _mediator = mediator;
         }
 
+        [HttpPost("createdescriptor")]
+        public async Task<ActionResult<Result>> CreateDescriptor(CreateDescriptorStringCommand command)
+        {
+            try
+            {
+                return await _mediator.Send(command);
+            }
+            catch (Exception ex)
+            {
+                return Result.Failure($"Failed to create descriptor. Error: {ex?.Message ?? ex?.InnerException?.Message}");
+            }
+        }
 
         [HttpPost("createuser")]
         public async Task<ActionResult<Result>> CreateUser(CreateUserCommand command)

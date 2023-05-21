@@ -15,6 +15,7 @@ namespace Comgo.Application.Common.Interfaces
         Task<(bool success, string message)> GenerateAddressAsync(string userId);
         Task<(bool success, string message)> ListTransactions(string userid);
         Task<(bool success, string message)> SendToAddress(string address, string amountBtc);
+        Task<(bool success, string message)> CreateDescriptorString(string pubkeyone, string pubkeytwo);
         Task<(bool success, WalletBalance response)> GetWalletBalance(string userId);
         Task<(bool success, string message, KeyPairResponse entity)> CreateNewKeyPairAsync(string userId, string publicKey);
         Task<(bool success, string message)> ConfirmUserTransaction(string userId, string reference);

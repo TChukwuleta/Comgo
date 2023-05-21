@@ -1,4 +1,5 @@
-﻿using Comgo.Application.Users.Commands;
+﻿using Comgo.Application.Users;
+using Comgo.Application.Users.Commands;
 using Comgo.Application.Users.Queries;
 using Comgo.Core.Model;
 using Comgo.Infrastructure.Utility;
@@ -26,6 +27,7 @@ namespace Comgo.Api.Controllers
         }
 
 
+
         [HttpPost("sendmoneyrequest")]
         public async Task<ActionResult<Result>> CreateTransaction(SendPaymentCommand command)
         {
@@ -39,7 +41,7 @@ namespace Comgo.Api.Controllers
                 return Result.Failure($"Failed to create payment request. Error: {ex?.Message ?? ex?.InnerException?.Message}");
             }
         }
-
+        
         [HttpPost("createpsbt")]
         public async Task<ActionResult<Result>> CreatePSBT(CreateUserPSBTCommand command)
         {
