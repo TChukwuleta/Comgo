@@ -1,13 +1,9 @@
 ﻿using Comgo.Application.Common.Interfaces;
 using Comgo.Application.Common.Model.Request;
+using Comgo.Application.Common.Model.Response;
 using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
 using PayStack.Net;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Comgo.Infrastructure.Services
 {
@@ -23,7 +19,7 @@ namespace Comgo.Infrastructure.Services
             payStack = new PayStackApi(token);
         }
 
-        public async Task<string> MakePayment(PaystackPaymentRequest request)
+        public async Task<(bool success, PaystackInitializationResponse response, string message)> MakePayment(PaystackPaymentRequest request)
         {
             try
             {
@@ -39,9 +35,15 @@ namespace Comgo.Infrastructure.Services
                 TransactionInitializeResponse response = payStack.Transactions.Initialize(paymentRequest);
                 if (response.Status)
                 {
-                    return JsonConvert.SerializeObject(response.Data);
+                    PaystackInitializationResponse paystackInitialization = new()
+                    {
+                        access_code = response.Data.AccessCode,
+                        authorization_url = response.Data.AuthorizationUrl,
+                        reference = response.Data.Reference
+                    };
+                    return (true, paystackInitialization, response.Message);
                 }
-                return response.Message;
+                return (false, null, response.Message);
             }
             catch (Exception ex)
             {

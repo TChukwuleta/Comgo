@@ -1,4 +1,5 @@
 ﻿using Comgo.Application.Common.Model.Request;
+using Comgo.Application.Common.Model.Response;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,7 +10,7 @@ namespace Comgo.Application.Common.Interfaces
 {
     public interface IPaystackService
     {
-        Task<string> MakePayment(PaystackPaymentRequest request);
+        Task<(bool success, PaystackInitializationResponse response, string message)> MakePayment(PaystackPaymentRequest request);
         Task<bool> VerifyPayment(string reference);
     }
 }

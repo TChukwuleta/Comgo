@@ -1,5 +1,4 @@
 ﻿using Comgo.Application.Common.Interfaces;
-using Comgo.Application.Common.Model;
 using Comgo.Application.Common.Model.Response;
 using Comgo.Application.Common.Model.Response.BitcoinCommandResponses;
 using Comgo.Core.Entities;
@@ -11,10 +10,9 @@ using NBitcoin.RPC;
 using NBitcoin.Scripting;
 using NBXplorer;
 using NBXplorer.DerivationStrategy;
-using NBXplorer.Models;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System.Net;
-using System.Text;
 
 namespace Comgo.Infrastructure.Services
 {
@@ -30,7 +28,7 @@ namespace Comgo.Infrastructure.Services
         private readonly string serverIp;
         private readonly string username;
         private readonly string password;
-        private readonly string walletname;
+        private readonly string _walletname;
         public BitcoinService(IConfiguration config, IEmailService emailService, IAppDbContext context,
             IEncryptionService encryptionService, IAuthService authService, IBitcoinCoreClient bitcoinCoreClient)
         {
@@ -44,7 +42,25 @@ namespace Comgo.Infrastructure.Services
             serverIp = _config["Bitcoin:URL"];
             username = _config["Bitcoin:username"];
             password = _config["Bitcoin:password"];
-            walletname = _config["Bitcoin:wallet"];
+            _walletname = _config["Bitcoin:wallet"];
+        }
+
+        public async Task<(bool success, string message)> CreateUserWallet(User user)
+        {
+            try
+            {
+                var rpc = await CreateRpcClient("");
+                var userWallet = await rpc.CreateWalletAsync(user.Walletname);
+                var userRPC = await CreateRpcClient(user.Walletname);
+                var userPoolRefill = await userRPC.SendCommandAsync(NBitcoin.RPC.RPCOperations.keypoolrefill);
+                user.IsWalletCreated = true;
+                await _authService.UpdateUserAsync(user);
+                return (true, "User wallet created successfully");
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
         }
 
         public async Task<(bool success, string message)> ConfirmUserTransaction(string userId, string reference)
@@ -74,6 +90,60 @@ namespace Comgo.Infrastructure.Services
                     throw new ArgumentException("An error occured while trying to confirm your transaction");
                 }
                 return (true, "An email has been sent to your mail. Kindly confirm by including the OTP");
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+
+        public async Task<(bool success, string message)> GenerateDescriptor(string walletname, User user)
+        {
+            try
+            {
+                var rpc = await CreateRpcClient(walletname);
+                var walletAddress = await rpc.GetNewAddressAsync();
+                var addressInfo = await rpc.GetAddressInfoAsync(walletAddress);
+                var publicKey = addressInfo.PubKey.ToString();
+                user.PublicKey = _encryptionService.EncryptData(publicKey);
+                await _authService.UpdateUserAsync(user);
+                return (true, addressInfo.Descriptor.ToString());
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+
+        public async Task<(bool success, string message)> ImportDescriptor(string adminDescriptor, User user)
+        {
+            try
+            {
+                var userPubKey = _encryptionService.DecryptData(user.PublicKey);
+                var userRpc = await CreateRpcClient(user.Walletname);
+                var descriptorResponse = await userRpc.SendCommandAsync("listdescriptors");
+                var userDescriptor = JsonConvert.DeserializeObject<ListDescriptorsResponse>(descriptorResponse.ResultString).descriptors.FirstOrDefault()?.desc;
+                string[] partsOne = userDescriptor.Split('[');
+                string strippedUserDescriptor = partsOne[1].Split(')')[0];
+                string descriptor = $"wsh(sortedmulti(2,{adminDescriptor},[{strippedUserDescriptor}))";
+                user.Descriptor = _encryptionService.EncryptData(descriptor);
+                await _authService.UpdateUserAsync(user);
+                var rpc = await CreateRpcClient(_walletname);
+                var walletDescriptor = new Dictionary<string, object>
+                {
+                    {"desc", descriptor },
+                    {"timestamp", "now" },
+                    {"internal", true },
+                    {"active", true },
+                    {"range",  new List<int> { 0, 100 } }
+                };
+
+                var response = await _bitcoinCoreClient.BitcoinRequestServer(_walletname, Core.Enums.RPCOperations.importdescriptors.ToString(), new List<object> { walletDescriptor });
+                if (string.IsNullOrEmpty(response))
+                {
+                    return (false, $"Failed to import descriptor.");
+                }
+                return (true, "Descriptor imported successfully");
             }
             catch (Exception ex)
             {
@@ -187,7 +257,7 @@ namespace Comgo.Infrastructure.Services
                     return (false, "Invalid user details");
                 }
                 var outputDescriptor = OutputDescriptor.NewWSH(descriptor, _network);
-                var generateAddress = await _bitcoinCoreClient.BitcoinRequestServer(walletname, Core.Enums.RPCOperations.deriveaddresses.ToString(), outputDescriptor.ToString());
+                var generateAddress = await _bitcoinCoreClient.BitcoinRequestServer("", Core.Enums.RPCOperations.deriveaddresses.ToString(), outputDescriptor.ToString());
                 var getAddress = JsonConvert.DeserializeObject<GenericListResponse>(generateAddress);
                 if (getAddress == null)
                 {
@@ -216,7 +286,7 @@ namespace Comgo.Infrastructure.Services
                     return (false, "Invalid user details", 0);
                 }
                 var outputDescriptor = OutputDescriptor.NewWSH(descriptor, _network);
-                var rpc = await CreateRpcClient();
+                var rpc = await CreateRpcClient("");
                 // Get all unspent transactions
                 var outputDescriptors = new ScanTxoutDescriptor(outputDescriptor);
                 ScanTxoutSetParameters scanner = new ScanTxoutSetParameters(outputDescriptor);
@@ -259,7 +329,7 @@ namespace Comgo.Infrastructure.Services
                 {
                     new TxOut(amountToSend, recipient),
                 };
-                var generateAddress = await _bitcoinCoreClient.BitcoinRequestServer(walletname, Core.Enums.RPCOperations.deriveaddresses.ToString(), outputDescriptor.ToString());
+                var generateAddress = await _bitcoinCoreClient.BitcoinRequestServer("", Core.Enums.RPCOperations.deriveaddresses.ToString(), outputDescriptor.ToString());
                 var getAddress = JsonConvert.DeserializeObject<GenericListResponse>(generateAddress);
                 if (getAddress == null)
                 {
@@ -271,7 +341,7 @@ namespace Comgo.Infrastructure.Services
                 }
                 var changeAddress = BitcoinAddress.Create(getAddress.result.FirstOrDefault(), _network);
                 
-                var rpc = await CreateRpcClient();
+                var rpc = await CreateRpcClient("");
                 // Get all unspent transactions
                 var outputDescriptors = new ScanTxoutDescriptor(descriptor);
                 ScanTxoutSetParameters scanner = new ScanTxoutSetParameters(outputDescriptor);
@@ -380,7 +450,8 @@ namespace Comgo.Infrastructure.Services
         {
             try
             {
-                var rpc = await CreateRpcClient();
+                var rpc = await CreateRpcClient("");
+                rpc.CreateWallet(userId);
                 var partialSignedTransaction = PSBT.TryParse(psbt, _network, out PSBT userSignedPSBT);
                 var doSth = await rpc.WalletProcessPSBTAsync(userSignedPSBT);
                 return (true, "Idan");
@@ -432,91 +503,6 @@ namespace Comgo.Infrastructure.Services
         }
 
 
-        public async Task<(bool success, string message)> CreatePSBT(string userid, string recipient)
-        {
-            try
-            {
-                // Get User required keys
-                var userPair = await _context.Signatures.FirstOrDefaultAsync(c => c.UserId == userid);
-                if (userPair == null)
-                {
-                    return (false, "An error occured while retrieving user key details. Kindly contact support");
-                }
-                var safeDetailsDecrypted = _encryptionService.DecryptData(userPair.UserSafeDetails);
-                var safeDetails = JsonConvert.DeserializeObject<SaveDetails>(safeDetailsDecrypted);
-
-                var pubKeyBytes = Encoding.ASCII.GetBytes(safeDetails.ExtPubKey);
-                var userExtPubKey = new ExtPubKey(pubKeyBytes);
-
-                var keyPath = new KeyPath(safeDetails.KeyPath);
-                var userRootKeyPath = new RootedKeyPath(userExtPubKey.ParentFingerprint, keyPath);
-
-                var getExtKey = Encoding.ASCII.GetBytes(safeDetails.ExtKey);
-                var userExtKey = ExtKey.CreateFromBytes(getExtKey);
-
-
-                // Get system required keys
-                var systemAdmin = await _authService.GetSuperAdmin(userid);
-                var systemPair = await _context.Signatures.FirstOrDefaultAsync(c => c.UserId == systemAdmin.user.UserId);
-                if (systemPair == null)
-                {
-                    return (false, "An error occured while retrieving system key details. Kindly contact support");
-                }
-                var systemDecryptedSafeDetails = _encryptionService.DecryptData(systemPair.UserSafeDetails);
-                var systemSafeDetails = JsonConvert.DeserializeObject<SaveDetails>(systemDecryptedSafeDetails);
-
-                var keyBytes = Encoding.ASCII.GetBytes(systemSafeDetails.ExtPubKey);
-                var systemExtPubKey = new ExtPubKey(keyBytes);
-
-                var sysKeyPath = new KeyPath(safeDetails.KeyPath);
-                var systemRootKeyPath = new RootedKeyPath(systemExtPubKey.ParentFingerprint, sysKeyPath);
-
-                var getSysExtKey = Encoding.ASCII.GetBytes(systemSafeDetails.ExtKey);
-                var systemExtKey = ExtKey.CreateFromBytes(getSysExtKey);
-
-
-                // Get client, derivation strategy
-                var client = CreateNBXplorerClient(_network);
-                var strategy = await GetDerivationStrategy(userid);
-                var bitcoinAddress = BitcoinAddress.Create(recipient, _network);
-
-                // create psbt
-                var psbt = (await client.CreatePSBTAsync(strategy, new CreatePSBTRequest()
-                {
-                    Destinations =
-                    {
-                        new CreatePSBTDestination()
-                        {
-                            Destination = bitcoinAddress,
-                            Amount = Money.Coins(0.4m),
-                            SubstractFees = true
-                        }
-                    },
-                    FeePreference = new FeePreference()
-                    {
-                        ExplicitFeeRate = new FeeRate(10.0m)
-                    }
-                })).PSBT;
-
-                // User signs the psbt
-                var userSigns = Sign(userExtPubKey, userRootKeyPath, userExtKey, strategy, psbt);
-                // System signs the psbt
-                var systemSigns = Sign(systemExtPubKey, systemRootKeyPath, systemExtKey, strategy, psbt);
-                // Both signed psbt are combined (2 of 2)
-                var signedPSBT = userSigns.Combine(systemSigns);
-                signedPSBT.Finalize();
-                // Get transactions
-                var signedTransaction = signedPSBT.ExtractTransaction();
-                // Broadcast the signed transaction to the blockchain
-                await client.BroadcastAsync(signedTransaction);
-                return (true, "transaction broadcasted successfully");
-            }
-            catch (Exception ex)
-            {
-                throw ex;
-            }
-        }
-
         public async Task<(bool success, string message)> ListTransactions(string userid)
         {
             var txResponse = new List<TxOutResponse>();
@@ -561,39 +547,6 @@ namespace Comgo.Infrastructure.Services
             return client;
         }
 
-        private static PSBT Sign(ExtPubKey pubkey, RootedKeyPath keypath, ExtKey extKey, DerivationStrategyBase derivationStrategy, PSBT psbt)
-        {
-            try
-            {
-                psbt = psbt.Clone();
-                psbt.RebaseKeyPaths(pubkey, keypath);
-                var spend = psbt.GetBalance(derivationStrategy, pubkey, keypath);
-                psbt.SignAll(derivationStrategy, extKey.Derive(keypath), keypath);
-                return psbt;
-            }
-            catch (Exception ex)
-            {
-                throw ex;
-            }
-
-        }
-
-
-        // Look out for transaction sent to any user's wallet on the system
-        private static async Task<NewTransactionEvent> WaitTransaction(LongPollingNotificationSession events, DerivationStrategyBase derivationStrategy)
-        {
-            while (true)
-            {
-                var evt = await events.NextEventAsync();
-                if (evt is NewTransactionEvent tx)
-                {
-                    if (tx.DerivationStrategy == derivationStrategy)
-                    {
-                        return tx;
-                    }
-                }
-            }
-        }
 
         // Handle derivation strategy which is what the system would use to track every user's wallet on the system
         private async Task<DerivationStrategyBase> GetDerivationStrategy(string userid)
@@ -631,7 +584,8 @@ namespace Comgo.Infrastructure.Services
             }
         }
 
-        private async Task<RPCClient> CreateRpcClientCommand()
+
+        private async Task<RPCClient> CreateRpcClient(string walletname)
         {
             try
             {
@@ -640,27 +594,15 @@ namespace Comgo.Infrastructure.Services
                     UserName = username,
                     Password = password
                 };
-                var rpc = new RPCClient(credential, $"{serverIp}/wallet/{walletname}", _network);
-                return rpc;
-            }
-            catch (Exception ex)
-            {
-                throw ex;
-            }
-        }
-
-
-
-        private async Task<RPCClient> CreateRpcClient()
-        {
-            try
-            {
-                var credential = new NetworkCredential
+                RPCClient rpc = default;
+                if (string.IsNullOrEmpty(walletname))
                 {
-                    UserName = username,
-                    Password = password
-                };
-                var rpc = new RPCClient(credential, $"{serverIp}/wallet/{walletname}", _network);
+                    rpc = new RPCClient(credential, $"{serverIp}", _network);
+                }
+                else
+                {
+                    rpc = new RPCClient(credential, $"{serverIp}/wallet/{walletname}", _network);
+                }
                 return rpc;
             }
             catch (Exception ex)

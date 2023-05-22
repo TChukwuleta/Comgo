@@ -88,6 +88,48 @@ namespace Comgo.Infrastructure.Services
             }
         }
 
+        public async Task<string> BitcoinRequestServer(string walletname, string methodName, List<object> parameters)
+        {
+            string response = default;
+            var url = serverIp;
+            if (!string.IsNullOrEmpty(walletname))
+            {
+                url = $"{url}/wallet/{walletname}";
+            }
+            try
+            {
+                HttpWebRequest webRequest = (HttpWebRequest)WebRequest.Create(url);
+                webRequest.Credentials = new NetworkCredential(username, password);
+                webRequest.Method = "POST";
+                webRequest.ContentType = "application/json-rpc";
+
+                JObject joe = new JObject();
+                joe.Add(new JProperty("jsonrpc", "1.0"));
+                joe.Add(new JProperty("id", "curltest"));
+                joe.Add(new JProperty("method", methodName));
+                joe.Add(new JProperty("params", JArray.FromObject(parameters)));
+
+                string s = JsonConvert.SerializeObject(joe);
+                byte[] byteArray = Encoding.UTF8.GetBytes(s);
+                webRequest.ContentLength = byteArray.Length;
+                Stream stream = webRequest.GetRequestStream();
+                stream.Write(byteArray, 0, byteArray.Length);
+                stream.Close();
+
+                StreamReader streamReader = null;
+                WebResponse webResponse = webRequest.GetResponse();
+                streamReader = new StreamReader(webResponse.GetResponseStream(), true);
+                response = streamReader.ReadToEnd();
+                var data = JsonConvert.DeserializeObject(response).ToString();
+                return data;
+            }
+            catch (Exception ex)
+            {
+
+                throw ex;
+            }
+        }
+
         public async Task<string> BitcoinRequestServer(string methodName, List<JToken> parameters)
         {
             string response = default;

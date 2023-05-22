@@ -9,7 +9,6 @@ namespace Comgo.Application.Users.Commands
     {
         public string Email { get; set; }
         public string Password { get; set; }
-        public string PublicKey { get; set; }
     }
 
     public class UserLoginCommandHandler : IRequestHandler<UserLoginCommand, Result>
@@ -26,22 +25,21 @@ namespace Comgo.Application.Users.Commands
         {
             try
             {
+                var user = await _authService.GetUserByEmail(request.Email);
                 var userLogin = await _authService.Login(request.Email, request.Password);
                 if (userLogin == null)
                 {
                     return Result.Failure($"User login was not successful.");
                 }
-                var createCustody = await _bitcoinService.CreateNewKeyPairAsync(userLogin.UserId, request.PublicKey);
-                if (!createCustody.success)
+                if (!user.user.IsWalletCreated)
                 {
-                    return Result.Failure(createCustody.message);
+                    var createWallet = await _bitcoinService.CreateUserWallet(user.user);
+                    if (!createWallet.success)
+                    {
+                        return Result.Failure(createWallet.message);
+                    }
                 }
-                var response = new
-                {
-                    LoginDetails = userLogin,
-                    Signature = createCustody.entity
-                };
-                return Result.Success(response);
+                return Result.Success(userLogin);
             }
             catch (Exception ex)
             {

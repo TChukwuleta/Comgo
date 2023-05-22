@@ -7,6 +7,7 @@ using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Mail;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -22,14 +23,10 @@ namespace Comgo.Application.Users.Commands
     public class CreateUserCommandHandler : IRequestHandler<CreateUserCommand, Result>
     {
         private readonly IAuthService _authService;
-        private readonly IAppDbContext _context;
         private readonly IEmailService _emailService;
-        private readonly IConfiguration _config;
-        public CreateUserCommandHandler(IAuthService authService, IAppDbContext context, IConfiguration config, IEmailService emailService)
+        public CreateUserCommandHandler(IAuthService authService, IEmailService emailService)
         {
             _authService = authService;
-            _context = context;
-            _config = config;
             _emailService = emailService;
         }
 
@@ -42,6 +39,7 @@ namespace Comgo.Application.Users.Commands
                 {
                     return Result.Failure("User already exist with this detail");
                 }
+                MailAddress address = new MailAddress(request.Email);
                 var allUsers = await _authService.GetAllUsers(0, 0);
                 var existingUser = allUsers.users.FirstOrDefault(c => c.Name.ToLower() == request.Name.ToLower());
                 if (existingUser != null)
@@ -51,6 +49,7 @@ namespace Comgo.Application.Users.Commands
                 var newUser = new User
                 {
                     Name = request.Name,
+                    Walletname = address.User,
                     Email = request.Email,
                     Password = request.Password,
                     UserType = Core.Enums.UserType.User

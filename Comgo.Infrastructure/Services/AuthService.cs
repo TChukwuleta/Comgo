@@ -75,7 +75,9 @@ namespace Comgo.Infrastructure.Services
                     Status = Status.Deactivated,
                     UserName = user.Email,
                     NormalizedEmail = user.Email,
+                    WalletName = user.Walletname,
                     HasPaid = false,
+                    IsWalletCreated = false,
                     EmailConfirmed = true,
                     UserType = user.UserType
                 };
@@ -177,6 +179,8 @@ namespace Comgo.Infrastructure.Services
                         Name = appUser.Name,
                         Email = appUser.Email,
                         UserId = appUser.Id,
+                        Walletname = appUser.WalletName,
+                        IsWalletCreated = appUser.IsWalletCreated,
                         Status = appUser.Status,
                     });
                 }
@@ -230,8 +234,12 @@ namespace Comgo.Infrastructure.Services
                     Name = existingUser.Name,
                     Email = existingUser.UserName,
                     UserId = existingUser.Id,
+                    Walletname = existingUser.WalletName,
+                    Descriptor = existingUser.Descriptor,
+                    PublicKey = existingUser.PublicKey,
                     Status = existingUser.Status,
-                    EmailConfirmed = existingUser.EmailConfirmed
+                    EmailConfirmed = existingUser.EmailConfirmed,
+                    IsWalletCreated = existingUser.IsWalletCreated,
                 };
                 return (Result.Success("User details retrieval was successful"), user);
             }
@@ -256,7 +264,11 @@ namespace Comgo.Infrastructure.Services
                     Name = existingUser.Name,
                     Email = existingUser.UserName,
                     UserId = existingUser.Id,
-                    Status = existingUser.Status
+                    Descriptor = existingUser.Descriptor,
+                    Walletname = existingUser.WalletName,
+                    Status = existingUser.Status,
+                    PublicKey = existingUser.PublicKey,
+                    IsWalletCreated = existingUser.IsWalletCreated,
                 };
                 return (Result.Success("User details retrieval was successful"), user);
             }
@@ -342,7 +354,10 @@ namespace Comgo.Infrastructure.Services
                     return Result.Failure("Invalid user details specified");
                 }
                 existingUser.Name = user.Name;
+                existingUser.PublicKey = user.PublicKey;
                 existingUser.Status = user.Status;
+                existingUser.Descriptor = user.Descriptor;
+                existingUser.IsWalletCreated = user.IsWalletCreated;
                 existingUser.UserCount = user.UserCount;
                 var update = await _userManager.UpdateAsync(existingUser);
                 if (!update.Succeeded)

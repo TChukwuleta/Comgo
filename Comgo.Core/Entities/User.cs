@@ -13,6 +13,10 @@ namespace Comgo.Core.Entities
         public string Email { get; set; }
         public string Password { get; set; }
         public string UserId { get; set; }
+        public bool IsWalletCreated { get; set; }
+        public string Descriptor { get; set; }
+        public string Walletname { get; set; }
+        public string PublicKey { get; set; }
         public Status Status { get; set; }
         public UserType UserType { get; set; }
         public bool EmailConfirmed { get; set; }

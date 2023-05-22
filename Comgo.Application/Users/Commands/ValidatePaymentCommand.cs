@@ -45,13 +45,7 @@ namespace Comgo.Application.Users.Commands
                 {
                     return Result.Failure($"This transaction has been {transaction.TransactionStatus.ToString()}");
                 }
-
-                var sendTransaction = await _bitcoinService.CreatePSBT(request.UserId, transaction.CreditAddress);
-                if (!sendTransaction.success)
-                {
-                    return Result.Failure("An error occured while making payment");
-                }
-                return Result.Success(sendTransaction.message);
+                return Result.Success("done");
 
             }
             catch (Exception ex)

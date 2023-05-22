@@ -18,19 +18,6 @@ namespace Comgo.Api.Controllers
             _mediator = mediator;
         }
 
-        [HttpPost("createdescriptor")]
-        public async Task<ActionResult<Result>> CreateDescriptor(CreateDescriptorStringCommand command)
-        {
-            try
-            {
-                return await _mediator.Send(command);
-            }
-            catch (Exception ex)
-            {
-                return Result.Failure($"Failed to create descriptor. Error: {ex?.Message ?? ex?.InnerException?.Message}");
-            }
-        }
-
         [HttpPost("createuser")]
         public async Task<ActionResult<Result>> CreateUser(CreateUserCommand command)
         {

@@ -1,4 +1,5 @@
 ﻿using Comgo.Application.BitcoinMethods.Commands;
+using Comgo.Application.Users;
 using Comgo.Core.Model;
 using Comgo.Infrastructure.Utility;
 using MediatR;
@@ -35,6 +36,51 @@ namespace Comgo.Api.Controllers
             catch (Exception ex)
             {
                 return Result.Failure($"Failed to generate new address. Error: {ex?.Message ?? ex?.InnerException?.Message}");
+            }
+        }
+
+        [HttpPost("importdescriptor")]
+        public async Task<ActionResult<Result>> ImportDescriptor(ImportDescriptorCommand command)
+        {
+            try
+            {
+                accessToken.ValidateToken(command.UserId);
+                return await _mediator.Send(command);
+            }
+            catch (Exception ex)
+            {
+                return Result.Failure($"Failed to import descriptor. Error: {ex?.Message ?? ex?.InnerException?.Message}");
+            }
+        }
+
+        [HttpPost("generatedescriptorr")]
+        public async Task<ActionResult<Result>> GenerateDescriptorr(GenerateDescriptorCommand command)
+        {
+            try
+            {
+                return await _mediator.Send(command);
+            }
+            catch (Exception ex)
+            {
+                return Result.Failure($"Failed to generate new address. Error: {ex?.Message ?? ex?.InnerException?.Message}");
+            }
+        }
+
+
+        [HttpGet("getwalletdescriptor/{userId}")]
+        public async Task<ActionResult<Result>> GetWalletDescriptor(string userId)
+        {
+            try
+            {
+                accessToken.ValidateToken(userId);
+                return await _mediator.Send(new CreateDescriptorStringCommand
+                {
+                    UserId = userId
+                });
+            }
+            catch (Exception ex)
+            {
+                return Result.Failure($"Failed to generate wallet descriptor.{ex?.Message ?? ex?.InnerException?.Message}");
             }
         }
     }

@@ -71,7 +71,11 @@ namespace Comgo.Application.Users.Commands
                             Amount = int.Parse(nairaFees)
                         };
                         var paystackInitialtion = await _paystackService.MakePayment(paystackRequest);
-                        return Result.Success("Paystack initiation was successful", paystackInitialtion);
+                        if (!paystackInitialtion.success)
+                        {
+                            return Result.Failure(paystackInitialtion.message);
+                        }
+                        return Result.Success("Paystack initiation was successful", paystackInitialtion.response);
                     default:
                         return Result.Failure("Invalid payment mode type selected");
                 }
