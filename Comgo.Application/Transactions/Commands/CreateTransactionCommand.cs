@@ -4,17 +4,13 @@ using Comgo.Core.Entities;
 using Comgo.Core.Enums;
 using Comgo.Core.Model;
 using MediatR;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Comgo.Application.Transactions.Commands
 {
     public class CreateTransactionCommand : IRequest<Result>, IBaseValidator
     {
         public string Description { get; set; }
+        public string Reference { get; set; }
         public string DebitAddress { get; set; }
         public string CreditAddress { get; set; }
         public PaymentModeType PaymentMode { get; set; }

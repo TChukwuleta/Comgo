@@ -41,7 +41,7 @@ namespace Comgo.Application.Transactions.Commands
                     UserId = request.UserId,
                     Amount = request.Amount,
                     TransactionType = request.TransactionType,
-                    TransactionReference = reference,
+                    TransactionReference = string.IsNullOrEmpty(request.Reference) ? reference : request.Reference,
                     PaymentModeType = request.PaymentMode,
                     TransactionStatus = TransactionStatus.Initiated,
                     Narration = request.Description,

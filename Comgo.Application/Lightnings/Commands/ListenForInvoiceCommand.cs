@@ -17,14 +17,10 @@ namespace Comgo.Application.Lightnings.Commands
     {
         private readonly IAuthService _authService;
         private readonly ILightningService _lightningService;
-        private readonly IAppDbContext _context;
-        private readonly IBitcoinService _bitcoinService;
-        public ListenForInvoiceCommandHandler(IAuthService authService, ILightningService lightningService, IAppDbContext context, IBitcoinService bitcoinService)
+        public ListenForInvoiceCommandHandler(IAuthService authService, ILightningService lightningService)
         {
             _authService = authService;
             _lightningService = lightningService;
-            _context = context;
-            _bitcoinService = bitcoinService;
         }
 
         public async Task<Result> Handle(ListenForInvoiceCommand request, CancellationToken cancellationToken)

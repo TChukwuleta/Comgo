@@ -1,5 +1,4 @@
-﻿using Comgo.Application.Users;
-using Comgo.Application.Users.Commands;
+﻿using Comgo.Application.Users.Commands;
 using Comgo.Application.Users.Queries;
 using Comgo.Core.Model;
 using Comgo.Infrastructure.Utility;
@@ -28,8 +27,8 @@ namespace Comgo.Api.Controllers
 
 
 
-        [HttpPost("sendmoneyrequest")]
-        public async Task<ActionResult<Result>> CreateTransaction(SendPaymentCommand command)
+        [HttpPost("paymentrequest")]
+        public async Task<ActionResult<Result>> PaymentRequest(SendPaymentCommand command)
         {
             try
             {
@@ -41,7 +40,21 @@ namespace Comgo.Api.Controllers
                 return Result.Failure($"Failed to create payment request. Error: {ex?.Message ?? ex?.InnerException?.Message}");
             }
         }
-        
+
+        [HttpPost("validatepaymentrequest")]
+        public async Task<ActionResult<Result>> ValidatePaymentRequest(ValidatePaymentCommand command)
+        {
+            try
+            {
+                accessToken.ValidateToken(command.UserId);
+                return await _mediator.Send(command);
+            }
+            catch (Exception ex)
+            {
+                return Result.Failure($"Failed to maked payment. Error: {ex?.Message ?? ex?.InnerException?.Message}");
+            }
+        }
+
         [HttpPost("createpsbt")]
         public async Task<ActionResult<Result>> CreatePSBT(CreateUserPSBTCommand command)
         {
@@ -53,20 +66,6 @@ namespace Comgo.Api.Controllers
             catch (Exception ex)
             {
                 return Result.Failure($"Failed to create PSBT. Error: {ex?.Message ?? ex?.InnerException?.Message}");
-            }
-        }
-
-        [HttpPost("validateandmakepayment")]
-        public async Task<ActionResult<Result>> ValidateAndMakePayment(ValidatePaymentCommand command)
-        {
-            try
-            {
-                accessToken.ValidateToken(command.UserId);
-                return await _mediator.Send(command);
-            }
-            catch (Exception ex)
-            {
-                return Result.Failure($"Failed to maked payment. Error: {ex?.Message ?? ex?.InnerException?.Message}");
             }
         }
 

@@ -53,8 +53,8 @@ namespace Comgo.Api.Controllers
             }
         }
 
-        [HttpPost("generatedescriptorr")]
-        public async Task<ActionResult<Result>> GenerateDescriptorr(GenerateDescriptorCommand command)
+        [HttpPost("generatedescriptoraddress")]
+        public async Task<ActionResult<Result>> GenerateDescriptorAddress(GenerateDescriptorAddressCommand command)
         {
             try
             {
@@ -66,6 +66,44 @@ namespace Comgo.Api.Controllers
             }
         }
 
+        [HttpPost("createpsbt")]
+        public async Task<ActionResult<Result>> CreatePSBT(GeneratePSBTCommand command)
+        {
+            try
+            {
+                return await _mediator.Send(command);
+            }
+            catch (Exception ex)
+            {
+                return Result.Failure($"Failed to generate PSBT. Error: {ex?.Message ?? ex?.InnerException?.Message}");
+            }
+        }
+
+        [HttpPost("processpsbt")]
+        public async Task<ActionResult<Result>> ProcessPSBT(ProcessPSBTCommand command)
+        {
+            try
+            {
+                return await _mediator.Send(command);
+            }
+            catch (Exception ex)
+            {
+                return Result.Failure($"Failed to process PSBT. Error: {ex?.Message ?? ex?.InnerException?.Message}");
+            }
+        }
+
+        [HttpPost("finalize")]
+        public async Task<ActionResult<Result>> FinalizePSBT(ProcessPSBTCommand command)
+        {
+            try
+            {
+                return await _mediator.Send(command);
+            }
+            catch (Exception ex)
+            {
+                return Result.Failure($"Failed to finalize PSBT. Error: {ex?.Message ?? ex?.InnerException?.Message}");
+            }
+        }
 
         [HttpGet("getwalletdescriptor/{userId}")]
         public async Task<ActionResult<Result>> GetWalletDescriptor(string userId)

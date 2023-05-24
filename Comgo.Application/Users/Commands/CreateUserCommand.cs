@@ -3,13 +3,7 @@ using Comgo.Application.Common.Interfaces.Validators.UserValidator;
 using Comgo.Core.Entities;
 using Comgo.Core.Model;
 using MediatR;
-using Microsoft.Extensions.Configuration;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net.Mail;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Comgo.Application.Users.Commands
 {
@@ -65,7 +59,7 @@ namespace Comgo.Application.Users.Commands
                 {
                     return Result.Failure("An error occured when generating otp");
                 }
-                var sendEmail = await _emailService.SendEmailAsync(request.Email, "User Registration", $"Thank you for registering on Comgo application. Kindly use the folowing OTP to conclude your registration {generateOtp.Entity.ToString()}");
+                var sendEmail = await _emailService.SendEmailViaGmailAsync("", generateOtp.Entity.ToString(), "Welcome on Board", request.Email, request.Name);
                 if (!sendEmail)
                 {
                     return Result.Failure("An error occured while sending email");

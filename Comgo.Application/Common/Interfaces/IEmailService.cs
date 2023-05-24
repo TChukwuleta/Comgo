@@ -5,11 +5,7 @@ namespace Comgo.Application.Common.Interfaces
     public interface IEmailService
     {
         Task<bool> SendEmailAsync(string email, string subject, string htmlMessage);
-        Task<bool> SendRegistrationEmailToUser(string Email, string message);
-        Task<bool> SendConfirmationEmailToUser(string email, string firstname, string reference, string message);
-        Task<bool> SendEmailMessage(string body, string subject, string recipient);
-
-        void SendEmail(Message message);
+        Task<bool> SendEmailViaGmailAsync(string body, string otp, string subject, string recipientEmail, string recipientName);
     }
 
     public class Message

@@ -18,13 +18,11 @@ namespace Comgo.Application.Users.Commands
         private readonly IAuthService _authService;
         private readonly IAppDbContext _context;
         private readonly IBitcoinService _bitcoinService;
-        private readonly IEmailService _emailService;
-        public ValidatePaymentCommandHandler(IAuthService authService, IAppDbContext context, IBitcoinService bitcoinService, IEmailService emailService)
+        public ValidatePaymentCommandHandler(IAuthService authService, IAppDbContext context, IBitcoinService bitcoinService)
         {
             _authService = authService;
             _context = context;
             _bitcoinService = bitcoinService;
-            _emailService = emailService;
         }
 
         public async Task<Result> Handle(ValidatePaymentCommand request, CancellationToken cancellationToken)
@@ -45,6 +43,7 @@ namespace Comgo.Application.Users.Commands
                 {
                     return Result.Failure($"This transaction has been {transaction.TransactionStatus.ToString()}");
                 }
+                var createPsbt = await _bitcoinService.CreateWalletPSTAsync(transaction.Amount, transaction.CreditAddress);
                 return Result.Success("done");
 
             }

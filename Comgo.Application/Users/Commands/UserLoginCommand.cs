@@ -26,6 +26,10 @@ namespace Comgo.Application.Users.Commands
             try
             {
                 var user = await _authService.GetUserByEmail(request.Email);
+                if (user.user.Status != Core.Enums.Status.Active)
+                {
+                    return Result.Failure("User login was not successful. User is currently disabled");
+                }
                 var userLogin = await _authService.Login(request.Email, request.Password);
                 if (userLogin == null)
                 {

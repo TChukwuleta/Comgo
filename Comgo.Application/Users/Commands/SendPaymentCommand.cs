@@ -19,17 +19,16 @@ namespace Comgo.Application.Users.Commands
         private readonly IAuthService _authService;
         private readonly IAppDbContext _context;
         private readonly IBitcoinService _bitcoinService;
-        private readonly IEmailService _emailService;
-        public SendPaymentCommandHandler(IAuthService authService, IAppDbContext context, IBitcoinService bitcoinService, IEmailService emailService)
+        public SendPaymentCommandHandler(IAuthService authService, IAppDbContext context, IBitcoinService bitcoinService)
         {
             _authService = authService;
             _context = context;
             _bitcoinService = bitcoinService;
-            _emailService = emailService;
         }
 
         public async Task<Result> Handle(SendPaymentCommand request, CancellationToken cancellationToken)
         {
+            var reference = $"Comgo_{DateTime.Now.Ticks}";
             try
             {
                 var user = await _authService.GetUserById(request.UserId);
@@ -45,6 +44,7 @@ namespace Comgo.Application.Users.Commands
                 var createTransactionRequest = new CreateTransactionCommand
                 {
                     Description = request.Description,
+                    Reference = reference,
                     CreditAddress = request.DestinationAddress,
                     DebitAddress = address.message,
                     PaymentMode = Core.Enums.PaymentModeType.Bitcoin,
@@ -52,17 +52,18 @@ namespace Comgo.Application.Users.Commands
                     TransactionType = Core.Enums.TransactionType.Debit,
                     UserId = request.UserId
                 };
+                var confirmUserTransaction = await _bitcoinService.ValidateTransactionFromSender(request.UserId, reference, request.DestinationAddress);
+                if (!confirmUserTransaction.success)
+                {
+                    return Result.Failure(confirmUserTransaction.message);
+                }
                 var handler = new TransactionHelper(_authService, _context);
                 var createTransaction = await handler.CreateTransaction(createTransactionRequest, cancellationToken);
                 if (createTransaction == null)
                 {
                     return Result.Failure("An error occured while trying to create new transaction");
                 }
-                var confirmUserTransaction = await _bitcoinService.ConfirmUserTransaction(request.UserId, createTransaction.TransactionReference);
-                if (!confirmUserTransaction.success)
-                {
-                    return Result.Failure(confirmUserTransaction.message);
-                }
+                
                 return Result.Success(confirmUserTransaction.message);
                 
             }

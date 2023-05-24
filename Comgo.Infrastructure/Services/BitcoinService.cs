@@ -63,32 +63,27 @@ namespace Comgo.Infrastructure.Services
             }
         }
 
-        public async Task<(bool success, string message)> ConfirmUserTransaction(string userId, string reference)
+        public async Task<(bool success, string message)> ValidateTransactionFromSender(string userId, string reference, string destinationAddress)
         {
             try
             {
-                var user = await _authService.GetUserById(userId);
-                var userSigExist = await _authService.GetSuperAdmin(userId);
-
-                // Check that the public key of the user who wants to make a transfer exist
-                // If the user does exist, send OTP to the mail, else throw an error
-                var userKey = await _context.Signatures.FirstOrDefaultAsync(c => c.UserId == userId);
-                if (userKey == null)
+                var validateAddress = BitcoinAddress.Create(destinationAddress, _network);
+                if (validateAddress == null)
                 {
-                    return (false, "No user key record found. Please contact support");
+                    return (false, "Invalid bitcoin address specified");
                 }
+                var user = await _authService.GetUserById(userId);
                 var generateOtp = await _authService.GenerateOTP(user.user.Email, "confirm-transaction");
                 var errorMessage = generateOtp.Message != null ? generateOtp.Message : generateOtp.Messages.FirstOrDefault();
                 if (!generateOtp.Succeeded)
                 {
                     throw new ArgumentException(errorMessage);
                 }
-                //var sendEmail = await _emailService.SendEmailMessage(generateOtp.Entity.ToString(), "Transaction confirmation", user.user.Email);
-                var sendEmail = await _emailService.SendConfirmationEmailToUser(user.user.Email, user.user.Name, reference, generateOtp.Entity.ToString());
+                /*var sendEmail = await _emailService.SendConfirmationEmailToUser(user.user.Email, user.user.Name, reference, generateOtp.Entity.ToString());
                 if (!sendEmail)
                 {
                     throw new ArgumentException("An error occured while trying to confirm your transaction");
-                }
+                }*/
                 return (true, "An email has been sent to your mail. Kindly confirm by including the OTP");
             }
             catch (Exception ex)
@@ -97,11 +92,11 @@ namespace Comgo.Infrastructure.Services
             }
         }
 
-        public async Task<(bool success, string message)> GenerateDescriptor(string walletname, User user)
+        public async Task<(bool success, string message)> GenerateDescriptor(User user)
         {
             try
             {
-                var rpc = await CreateRpcClient(walletname);
+                var rpc = await CreateRpcClient(user.Walletname);
                 var walletAddress = await rpc.GetNewAddressAsync();
                 var addressInfo = await rpc.GetAddressInfoAsync(walletAddress);
                 var publicKey = addressInfo.PubKey.ToString();
@@ -115,17 +110,20 @@ namespace Comgo.Infrastructure.Services
             }
         }
 
-        public async Task<(bool success, string message)> ImportDescriptor(string adminDescriptor, User user)
+        public async Task<(bool success, string message)> ImportDescriptor(User user)
         {
+            var adminDescriptor = _config["Bitcoin:AdminDescriptor"];
             try
             {
-                var userPubKey = _encryptionService.DecryptData(user.PublicKey);
                 var userRpc = await CreateRpcClient(user.Walletname);
                 var descriptorResponse = await userRpc.SendCommandAsync("listdescriptors");
                 var userDescriptor = JsonConvert.DeserializeObject<ListDescriptorsResponse>(descriptorResponse.ResultString).descriptors.FirstOrDefault()?.desc;
                 string[] partsOne = userDescriptor.Split('[');
                 string strippedUserDescriptor = partsOne[1].Split(')')[0];
                 string descriptor = $"wsh(sortedmulti(2,{adminDescriptor},[{strippedUserDescriptor}))";
+                var getdescriptorInfo = await userRpc.SendCommandAsync("getdescriptorinfo", descriptor);
+                var descriptorInfo = JsonConvert.DeserializeObject<DescriptorInfoResponse>(getdescriptorInfo.ResultString);
+                descriptor = $"{descriptor}#{descriptorInfo.checksum}";
                 user.Descriptor = _encryptionService.EncryptData(descriptor);
                 await _authService.UpdateUserAsync(user);
                 var rpc = await CreateRpcClient(_walletname);
@@ -143,7 +141,7 @@ namespace Comgo.Infrastructure.Services
                 {
                     return (false, $"Failed to import descriptor.");
                 }
-                return (true, "Descriptor imported successfully");
+                return (true, descriptor);
             }
             catch (Exception ex)
             {
@@ -151,35 +149,82 @@ namespace Comgo.Infrastructure.Services
             }
         }
 
-        public async Task<(bool success, string message)> CreateDescriptorString(string pubkeyone, string pubkeytwo)
+        public async Task<(bool success, string message)> GenerateDescriptorAddress(string descriptor)
         {
             try
             {
-                var userPubkey = new PubKey(pubkeyone);
-                if (userPubkey == null)
-                {
-                    return (false, "Invalid public key one");
-                }
+                var rpc = await CreateRpcClient(_walletname);
+                var range = new[] { 0, 1 };
 
-                var userPubkeTwo = new PubKey(pubkeytwo);
-                if (userPubkey == null)
+                var deriveAddress = await rpc.SendCommandAsync("deriveaddresses", descriptor, range);
+                var descriptorAddresses = JsonConvert.DeserializeObject<List<string>>(deriveAddress.ResultString);
+                return (true, descriptorAddresses.FirstOrDefault());
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+
+        
+
+        public async Task<(bool success, PSBTResponse message)> CreateWalletPSTAsync(decimal amount, string address)
+        {
+            try
+            {
+                var rpc = await CreateRpcClient(_walletname);
+                var btcAddress = BitcoinAddress.Create(address, _network);
+
+                TxIn[] inputs = new TxIn[] { };
+                var outputs = new Dictionary<BitcoinAddress, string>()
                 {
-                    return (false, "Invalid public key two");
-                }
-                var cosigners = new List<PubKey>
-                {
-                    userPubkeTwo,
-                    userPubkey,
+                    { btcAddress, amount.ToString() }
                 };
-                List<PubKeyProvider> pubKeysProvider = new();
-                foreach (var cosigner in cosigners)
+                var options = new Dictionary<string, string>()
                 {
-                    var provider = PubKeyProvider.NewConst(cosigner);
-                    pubKeysProvider.Add(provider);
-                }
-                var descriptor = OutputDescriptor.NewMulti(2, pubKeysProvider, true, _network);
-                var outputDescriptor = OutputDescriptor.NewWSH(descriptor, _network);
-                return (true, outputDescriptor.ToString());
+                    { "fee_rate", "20" }
+                };
+                var param = Tuple.Create(outputs, options);
+
+                var psbtResponse = await rpc.SendCommandAsync("walletcreatefundedpsbt", JArray.FromObject(inputs), JToken.FromObject(outputs), 0, JObject.FromObject(options));
+                var psbt = JsonConvert.DeserializeObject<PSBTResponse>(psbtResponse.ResultString);
+                return (true, psbt);
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+
+        public async Task<(bool success, object message)> ProcessPSBTAsync(string walletname, string psbt)
+        {
+            try
+            {
+                var rpc = await CreateRpcClient(walletname);
+                PSBT.TryParse(psbt, _network, out PSBT request);
+                var processPSBT = await rpc.WalletProcessPSBTAsync(request);
+                var psbtResponse = new
+                {
+                    PSBT = processPSBT.PSBT.ToBase64(),
+                    Complete = processPSBT.Complete
+                };
+                Console.WriteLine(JsonConvert.SerializeObject(processPSBT.PSBT));
+                return (true, psbtResponse);
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+
+        public async Task<(bool success, string message)> FinalizePSBTAsync(string walletname, string psbt)
+        {
+            try
+            {
+                var rpc = await CreateRpcClient(walletname);
+                PSBT.TryParse(psbt, _network, out PSBT request);
+                var finalizePSBT = await rpc.SendCommandAsync("finalizepsbt", request);
+                return (true, finalizePSBT.ResultString);
             }
             catch (Exception ex)
             {

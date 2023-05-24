@@ -23,7 +23,6 @@ namespace Comgo.Application.BitcoinMethods.Commands
         }
         public async Task<Result> Handle(ImportDescriptorCommand request, CancellationToken cancellationToken)
         {
-            var adminDescriptor = _config["Bitcoin:AdminDescriptor"];
             try
             {
                 var user = await _authService.GetUserById(request.UserId);
@@ -31,7 +30,7 @@ namespace Comgo.Application.BitcoinMethods.Commands
                 {
                     return Result.Failure("Invalid user selected");
                 }
-                var importDescriptor = await _bitcoinService.ImportDescriptor(adminDescriptor, user.user);
+                var importDescriptor = await _bitcoinService.ImportDescriptor(user.user);
                 if (!importDescriptor.success)
                 {
                     return Result.Failure(importDescriptor.message);

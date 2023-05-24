@@ -34,4 +34,9 @@ namespace Comgo.Application.Common.Model.Response.BitcoinCommandResponses
         public string hdmasterfingerprint { get; set; }
         public List<string> labels { get; set; }
     }
+
+    public class DescriptorAddress
+    {
+        public List<string> MyArray { get; set; }
+    }
 }

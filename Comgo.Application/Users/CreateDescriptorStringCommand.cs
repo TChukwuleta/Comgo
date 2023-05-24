@@ -27,7 +27,7 @@ namespace Comgo.Application.Users
                 {
                     return Result.Failure("Invalid user selected");
                 }
-                var response = await _bitcoinService.GenerateDescriptor(user.user.Walletname, user.user);
+                var response = await _bitcoinService.GenerateDescriptor(user.user);
                 if (!response.success)
                 {
                     return Result.Failure($"Failed to retrieve wallet descriptors. {response.message}");
