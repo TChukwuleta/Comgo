@@ -62,7 +62,7 @@ namespace Comgo.Application.Users.Commands
                 var sendEmail = await _emailService.SendEmailViaGmailAsync("", generateOtp.Entity.ToString(), "Welcome on Board", request.Email, request.Name);
                 if (!sendEmail)
                 {
-                    return Result.Failure("An error occured while sending email");
+                    return Result.Failure($"An error occured while sending email. OTP value is {generateOtp.Entity.ToString()}");
                 }
                 return Result.Success("User creation was successful. Kindly check your email for token", newUser);
             }

@@ -40,22 +40,6 @@ namespace Comgo.Api.Controllers
             }
         }
 
-        [HttpGet("getbitcointransactions/{userid}")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        public async Task<ActionResult<Result>> GetBitcoinTransactions(string userid)
-        {
-            try
-            {
-                accessToken.ValidateToken(userid);
-                return await _mediator.Send(new GetAllBitcoinTransactionQuery {UserId = userid });
-            }
-            catch (Exception ex)
-            {
-                return Result.Failure($"Transactions retrieval by user failed. Error: {ex?.Message ?? ex?.InnerException?.Message}");
-            }
-        }
-
-
         [HttpGet("gettransactionsbyid/{skip}/{take}/{userid}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         public async Task<ActionResult<Result>> GetAllTransactionsByUser(int skip, int take, string userid)

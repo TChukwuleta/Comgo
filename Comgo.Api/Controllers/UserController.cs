@@ -1,4 +1,5 @@
-﻿using Comgo.Application.Users.Commands;
+﻿using Comgo.Application.BitcoinMethods.Commands;
+using Comgo.Application.Users.Commands;
 using Comgo.Application.Users.Queries;
 using Comgo.Core.Model;
 using Comgo.Infrastructure.Utility;
@@ -25,10 +26,8 @@ namespace Comgo.Api.Controllers
             }
         }
 
-
-
         [HttpPost("paymentrequest")]
-        public async Task<ActionResult<Result>> PaymentRequest(SendPaymentCommand command)
+        public async Task<ActionResult<Result>> PaymentRequest(InitiatePaymentCommand command)
         {
             try
             {
@@ -51,12 +50,12 @@ namespace Comgo.Api.Controllers
             }
             catch (Exception ex)
             {
-                return Result.Failure($"Failed to maked payment. Error: {ex?.Message ?? ex?.InnerException?.Message}");
+                return Result.Failure($"Failed to process payment. Error: {ex?.Message ?? ex?.InnerException?.Message}");
             }
         }
 
-        [HttpPost("createpsbt")]
-        public async Task<ActionResult<Result>> CreatePSBT(CreateUserPSBTCommand command)
+        [HttpPost("finalizetransaction")]
+        public async Task<ActionResult<Result>> FinalizeTransaction(CompletePSBTTransactionCommand command)
         {
             try
             {
@@ -65,21 +64,7 @@ namespace Comgo.Api.Controllers
             }
             catch (Exception ex)
             {
-                return Result.Failure($"Failed to create PSBT. Error: {ex?.Message ?? ex?.InnerException?.Message}");
-            }
-        }
-
-        [HttpPost("sendtoaddress")]
-        public async Task<ActionResult<Result>> SendToAddress(SendToWalletAddressCommand command)
-        {
-            try
-            {
-                accessToken.ValidateToken(command.UserId);
-                return await _mediator.Send(command);
-            }
-            catch (Exception ex)
-            {
-                return Result.Failure($"Failed to send payment. Error: {ex?.Message ?? ex?.InnerException?.Message}");
+                return Result.Failure($"Failed to finalize payment. Error: {ex?.Message ?? ex?.InnerException?.Message}");
             }
         }
 

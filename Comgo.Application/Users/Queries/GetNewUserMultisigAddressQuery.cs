@@ -14,31 +14,47 @@ namespace Comgo.Application.Users.Queries
     {
         private readonly IAuthService _authService;
         private readonly IBitcoinService _bitcoinService;
-        public GetNewUserMultisigAddressQueryHandler(IAuthService authService, IBitcoinService bitcoinService)
+        private readonly IEncryptionService _encryptionService;
+        public GetNewUserMultisigAddressQueryHandler(IAuthService authService, IBitcoinService bitcoinService, IEncryptionService encryptionService)
         {
             _authService = authService;
             _bitcoinService = bitcoinService;
+            _encryptionService = encryptionService;
         }
 
         public async Task<Result> Handle(GetNewUserMultisigAddressQuery request, CancellationToken cancellationToken)
         {
             try
             {
-                var result = await _authService.GetUserById(request.UserId);
-                if (result.user == null)
+                string descriptor = default;
+                var user = await _authService.GetUserById(request.UserId);
+                if (user.user == null)
                 {
-                    return Result.Failure("No user found");
+                    return Result.Failure("Unable to generate descriptor address. Invalid user specified");
                 }
-                var generatedAddress = await _bitcoinService.GenerateAddress(request.UserId);
-                if (!generatedAddress.success)
+                if (string.IsNullOrEmpty(user.user.Descriptor))
                 {
-                    return Result.Failure(generatedAddress.message);
+                    var importDescriptor = await _bitcoinService.ImportDescriptor(user.user);
+                    if (!importDescriptor.success)
+                    {
+                        return Result.Failure(importDescriptor.message);
+                    }
+                    descriptor = importDescriptor.message;
                 }
-                return Result.Success("Multisig address generated successfully", generatedAddress.message);
+                else
+                {
+                    descriptor = user.user.Descriptor;
+                }
+                var deriveAddress = await _bitcoinService.GenerateDescriptorAddress(descriptor);
+                if (!deriveAddress.success)
+                {
+                    return Result.Failure(deriveAddress.message);
+                }
+                return Result.Success(deriveAddress.message);
             }
             catch (Exception ex)
             {
-                return Result.Failure($"Address generation was not successful. {ex?.Message ?? ex?.InnerException.Message}");
+                return Result.Failure($"Unable to generate descriptor address: {ex.Message}");
             }
         }
     }

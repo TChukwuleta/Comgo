@@ -6,7 +6,7 @@ using MediatR;
 
 namespace Comgo.Application.Users.Commands
 {
-    public class SendPaymentCommand : IRequest<Result>, IBaseValidator
+    public class InitiatePaymentCommand : IRequest<Result>, IBaseValidator
     {
         public decimal AmountInBtc { get; set; }
         public string Description { get; set; }
@@ -14,19 +14,19 @@ namespace Comgo.Application.Users.Commands
         public string UserId { get; set; }
     }
 
-    public class SendPaymentCommandHandler : IRequestHandler<SendPaymentCommand, Result>
+    public class InitiatePaymentCommandHandler : IRequestHandler<InitiatePaymentCommand, Result>
     {
         private readonly IAuthService _authService;
         private readonly IAppDbContext _context;
         private readonly IBitcoinService _bitcoinService;
-        public SendPaymentCommandHandler(IAuthService authService, IAppDbContext context, IBitcoinService bitcoinService)
+        public InitiatePaymentCommandHandler(IAuthService authService, IAppDbContext context, IBitcoinService bitcoinService)
         {
             _authService = authService;
             _context = context;
             _bitcoinService = bitcoinService;
         }
 
-        public async Task<Result> Handle(SendPaymentCommand request, CancellationToken cancellationToken)
+        public async Task<Result> Handle(InitiatePaymentCommand request, CancellationToken cancellationToken)
         {
             var reference = $"Comgo_{DateTime.Now.Ticks}";
             try
@@ -36,7 +36,7 @@ namespace Comgo.Application.Users.Commands
                 {
                     return Result.Failure("Transaction creation failed. Invalid user details");
                 }
-                var address = await _bitcoinService.GenerateAddress(request.UserId);
+                var address = await _bitcoinService.GenerateDescriptorAddress(user.user.Descriptor);
                 if (!address.success)
                 {
                     return Result.Failure("Address generation was not successful");
@@ -63,9 +63,7 @@ namespace Comgo.Application.Users.Commands
                 {
                     return Result.Failure("An error occured while trying to create new transaction");
                 }
-                
                 return Result.Success(confirmUserTransaction.message);
-                
             }
             catch (Exception ex)
             {

@@ -25,20 +25,6 @@ namespace Comgo.Api.Controllers
             }
         }
 
-        [HttpPost("generateaddress")]
-        public async Task<ActionResult<Result>> CreateTransaction(GenerateMultisigAddressCommand command)
-        {
-            try
-            {
-                accessToken.ValidateToken(command.UserId);
-                return await _mediator.Send(command);
-            }
-            catch (Exception ex)
-            {
-                return Result.Failure($"Failed to generate new address. Error: {ex?.Message ?? ex?.InnerException?.Message}");
-            }
-        }
-
         [HttpPost("importdescriptor")]
         public async Task<ActionResult<Result>> ImportDescriptor(ImportDescriptorCommand command)
         {
@@ -53,18 +39,6 @@ namespace Comgo.Api.Controllers
             }
         }
 
-        [HttpPost("generatedescriptoraddress")]
-        public async Task<ActionResult<Result>> GenerateDescriptorAddress(GenerateDescriptorAddressCommand command)
-        {
-            try
-            {
-                return await _mediator.Send(command);
-            }
-            catch (Exception ex)
-            {
-                return Result.Failure($"Failed to generate new address. Error: {ex?.Message ?? ex?.InnerException?.Message}");
-            }
-        }
 
         [HttpPost("createpsbt")]
         public async Task<ActionResult<Result>> CreatePSBT(GeneratePSBTCommand command)

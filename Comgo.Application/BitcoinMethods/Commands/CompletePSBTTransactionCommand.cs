@@ -4,12 +4,12 @@ using MediatR;
 
 namespace Comgo.Application.BitcoinMethods.Commands
 {
-    public class FinalizePSBTCommand : IRequest<Result>
+    public class CompletePSBTTransactionCommand : IRequest<Result>
     {
         public string PSBT { get; set; }
         public string UserId { get; set; }
     }
-    public class FinalizePSBTCommandHandler : IRequestHandler<FinalizePSBTCommand, Result>
+    public class FinalizePSBTCommandHandler : IRequestHandler<CompletePSBTTransactionCommand, Result>
     {
         private readonly IAuthService _authService;
         private readonly IBitcoinService _bitcoinService;
@@ -18,7 +18,7 @@ namespace Comgo.Application.BitcoinMethods.Commands
             _authService = authService;
             _bitcoinService = bitcoinService;
         }
-        public async Task<Result> Handle(FinalizePSBTCommand request, CancellationToken cancellationToken)
+        public async Task<Result> Handle(CompletePSBTTransactionCommand request, CancellationToken cancellationToken)
         {
             try
             {
@@ -27,7 +27,7 @@ namespace Comgo.Application.BitcoinMethods.Commands
                 {
                     return Result.Failure("Unable to finalize PSBT. Invalid user specified");
                 }
-                var deriveAddress = await _bitcoinService.FinalizePSBTAsync(user.user.Walletname, request.PSBT);
+                var deriveAddress = await _bitcoinService.ProcessPSBTAsync(user.user.Walletname, request.PSBT);
                 if (!deriveAddress.success)
                 {
                     return Result.Failure("An error occured while trying to finalize PSBT");
