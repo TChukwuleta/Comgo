@@ -17,12 +17,13 @@ namespace Comgo.Core.Entities
         public string Descriptor { get; set; }
         public bool IsWalletCreated { get; set; }
         public string PublicKey { get; set; }
+        public string Bio { get; set; }
+        public string Location { get; set; }
         public string WalletName { get; set; }
         public string UserId { get; set; }
         public Status Status { get; set; }
         public UserType UserType { get; set; }
         public string StatusDesc { get { return Status.ToString(); } }
-        public ICollection<Signature> Signatures { get; set; }
         public int? UserCount { get; set; }
     }
 }

@@ -1,17 +1,12 @@
 ﻿using Comgo.Application.Common.Interfaces;
 using Comgo.Core.Model;
 using MediatR;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Comgo.Application.Users.Commands
 {
     public class ChangePasswordCommand : IRequest<Result>
     {
-        public string Email { get; set; }
+        public string UserId { get; set; }
         public string OldPassword { get; set; }
         public string NewPassword { get; set; }
     }
@@ -28,12 +23,12 @@ namespace Comgo.Application.Users.Commands
         {
             try
             {
-                var existingUser = await _authService.GetUserByEmail(request.Email);
+                var existingUser = await _authService.GetUserById(request.UserId);
                 if (existingUser.user == null)
                 {
                     return Result.Failure("Password change was not successful. Invalid user details");
                 }
-                return await _authService.ChangePasswordAsync(request.Email, request.OldPassword, request.NewPassword);
+                return await _authService.ChangePasswordAsync(request.UserId, request.OldPassword, request.NewPassword);
             }
             catch (Exception ex)
             {

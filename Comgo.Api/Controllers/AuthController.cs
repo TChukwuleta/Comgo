@@ -95,5 +95,18 @@ namespace Comgo.Api.Controllers
                 return Result.Failure($"User login was not successful. Error: {ex?.Message ?? ex?.InnerException?.Message}");
             }
         }
+
+        [HttpPost("usertoken")]
+        public async Task<ActionResult<Result>> GetUserToken(GetUserTokenByIdCommand command)
+        {
+            try
+            {
+                return await _mediator.Send(command);
+            }
+            catch (Exception ex)
+            {
+                return Result.Failure($"User token retrieval was not successful. Error: {ex?.Message ?? ex?.InnerException?.Message}");
+            }
+        }
     }
 }

@@ -68,6 +68,34 @@ namespace Comgo.Api.Controllers
             }
         }
 
+        [HttpPost("changepassword")]
+        public async Task<ActionResult<Result>> ChangePassword(ChangePasswordCommand command)
+        {
+            try
+            {
+                accessToken.ValidateToken(command.UserId);
+                return await _mediator.Send(command);
+            }
+            catch (Exception ex)
+            {
+                return Result.Failure($"Failed to change password. Error: {ex?.Message ?? ex?.InnerException?.Message}");
+            }
+        }
+
+        [HttpPost("update")]
+        public async Task<ActionResult<Result>> UpdateUser(UpdateUserProfileCommand command)
+        {
+            try
+            {
+                accessToken.ValidateToken(command.UserId);
+                return await _mediator.Send(command);
+            }
+            catch (Exception ex)
+            {
+                return Result.Failure($"Failed to change password. Error: {ex?.Message ?? ex?.InnerException?.Message}");
+            }
+        }
+
         [HttpGet("generateaddress/{userId}")]
         public async Task<ActionResult<Result>> GenerateAddress(string userId)
         {
@@ -103,7 +131,7 @@ namespace Comgo.Api.Controllers
         }
         
 
-        [HttpGet("getusersbyid/{userId}")]
+        [HttpGet("getuserbyid/{userId}")]
         public async Task<ActionResult<Result>> GetUserByRoleId(string userId)
         {
             try

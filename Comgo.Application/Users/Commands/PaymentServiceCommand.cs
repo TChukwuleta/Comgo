@@ -1,6 +1,7 @@
 ﻿using Comgo.Application.Common.Interfaces;
 using Comgo.Application.Common.Interfaces.Validators;
 using Comgo.Application.Common.Model.Request;
+using Comgo.Application.Common.Model.Response;
 using Comgo.Core.Enums;
 using Comgo.Core.Model;
 using MediatR;
@@ -60,7 +61,12 @@ namespace Comgo.Application.Users.Commands
                         {
                             return Result.Failure("An error occured while generating invoice");
                         }
-                        return Result.Success("Invoice generation was successful", generateLightning);
+                        PaystackInitializationResponse lightningResponse = new()
+                        {
+                            authorization_url = generateLightning,
+                            reference = reference
+                        };
+                        return Result.Success("Invoice generation was successful", lightningResponse);
                         break;
                     case PaymentModeType.Fiat:
                         var paystackRequest = new PaystackPaymentRequest

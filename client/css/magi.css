@@ -1,0 +1,154 @@
+body {
+    background-color: #f5f5f5
+}
+
+.main {
+    background-color:#f5f5f5;
+    padding-top: 50px;
+    padding-bottom: 50px
+}
+
+.card {
+    background-color: #fff;
+    box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
+    width: 300px;
+    border-radius: 29px
+}
+
+.pay {
+    font-size: 18px;
+    color: #000;
+    font-weight: 600;
+    margin-top: 5px
+}
+
+.amount {
+    background-color: #f3f3fd;
+    border-radius: 8px
+}
+
+.inner {
+    padding-top: 8px;
+    padding-bottom: 8px;
+    padding-left: 19px;
+    padding-right: 19px
+}
+
+.dollar {
+    color: #a49ecc;
+    font-size: 20px;
+    font-weight: 500
+}
+
+.total {
+    font-size: 20px;
+    font-weight: 500;
+    color: #6458ab
+}
+
+.labeltxt {
+    font-size: 13px;
+    color: #adb5bd;
+    font-weight: 500;
+    margin-top: 5px
+}
+
+.image {
+    position: relative;
+    top: 39px;
+    right: 13px
+}
+
+.form-control {
+    border: 2px solid #c4c2d0;
+    border-radius: 7px
+}
+
+.inputtxt {
+    color: #000 !important;
+    font-weight: bold;
+    font-size: 14px;
+    padding-top: 21px;
+    padding-bottom: 21px
+}
+
+.exptxt {
+    color: #adb5bd;
+    font-size: 13px;
+    font-weight: 500
+}
+
+.cvvtxt {
+    color: #adb5bd;
+    font-size: 13px;
+    font-weight: 500
+}
+
+.expiry {
+    padding-top: 21px;
+    padding-bottom: 21px;
+    width: 120px;
+    font-size: 14px;
+    font-weight: bold
+}
+
+.cvv {
+    padding-top: 21px;
+    padding-bottom: 21px;
+    width: 120px
+}
+
+.cancel {
+    background-color: #fff;
+    color: #adb5bd;
+    font-size: 13px;
+    font-weight: 500;
+    border: none;
+    position: relative;
+    top: 24px
+}
+
+.cancel:hover {
+    background-color: #fff;
+    color: #adb5bd;
+    font-size: 13px;
+    font-weight: 500;
+    border: none
+}
+
+.cancel:focus {
+    background-color: #fff;
+    color: #adb5bd;
+    font-size: 13px;
+    font-weight: 500;
+    border: 1px solid #adb5bd
+}
+
+.payment {
+    font-weight: 600;
+    font-size: 14px;
+    border: none;
+    width: 150px;
+    padding-top: 21px;
+    padding-bottom: 21px;
+    padding-left: 10px;
+    padding-right: 10px;
+    border-radius: 11px
+}
+
+.payment:hover {
+    font-weight: 600;
+    font-size: 14px;
+    background-color: #673AB7;
+    border: none;
+    width: 150px;
+    padding-top: 21px;
+    padding-bottom: 21px;
+    padding-left: 10px;
+    padding-right: 10px;
+    border-radius: 11px
+}
+
+.payment:focus {
+    background-color: #673AB7
+}

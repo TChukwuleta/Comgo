@@ -21,6 +21,7 @@ namespace Comgo.Infrastructure.Services
 
         public async Task<(bool success, PaystackInitializationResponse response, string message)> MakePayment(PaystackPaymentRequest request)
         {
+            var callBackUrl = _config["FrontEnd:CallBackUrl"];
             try
             {
                 TransactionInitializeRequest paymentRequest = new()
@@ -29,7 +30,7 @@ namespace Comgo.Infrastructure.Services
                     Email = request.Email,
                     Reference = request.Reference,
                     Currency = "NGN",
-                    CallbackUrl = "http://localhost:7293/payment/verify"
+                    CallbackUrl = $"{callBackUrl}?email={request.Email}&reference={request.Reference}"
                 };
 
                 TransactionInitializeResponse response = payStack.Transactions.Initialize(paymentRequest);

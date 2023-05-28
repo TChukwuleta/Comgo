@@ -14,6 +14,8 @@ namespace Comgo.Core.Entities
         public string Password { get; set; }
         public string UserId { get; set; }
         public bool IsWalletCreated { get; set; }
+        public string Bio { get; set; }
+        public string Location { get; set; }
         public string Descriptor { get; set; }
         public string Walletname { get; set; }
         public string PublicKey { get; set; }

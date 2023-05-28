@@ -26,11 +26,11 @@ namespace Comgo.Infrastructure.Services
             _userManager = userManager;
         }
 
-        public async Task<Result> ChangePasswordAsync(string email, string oldPassword, string newPassword)
+        public async Task<Result> ChangePasswordAsync(string userId, string oldPassword, string newPassword)
         {
             try
             {
-                var user = await _userManager.FindByNameAsync(email);
+                var user = await _userManager.FindByIdAsync(userId);
                 if (user == null)
                 {
                     return Result.Failure("User not found");
@@ -72,7 +72,7 @@ namespace Comgo.Infrastructure.Services
                 {
                     Name = user.Name,
                     Email = user.Email,
-                    Status = Status.Deactivated,
+                    Status = Status.Active,
                     UserName = user.Email,
                     NormalizedEmail = user.Email,
                     WalletName = user.Walletname,
@@ -193,33 +193,6 @@ namespace Comgo.Infrastructure.Services
             }
         }
 
-        public async Task<(Result result, User user)> GetSuperAdmin(string userid)
-        {
-            try
-            {
-                var superAdmin = await _userManager.Users.Include(c => c.Signatures).FirstOrDefaultAsync(c => c.UserType == UserType.SuperAdmin);
-                if (superAdmin == null)
-                {
-                    return (Result.Failure("Super admin user does not exist"), null);
-                }
-
-                var user = new User
-                {
-                    Name = superAdmin.Name,
-                    Email = superAdmin.UserName,
-                    UserId = superAdmin.Id,
-                    Status = superAdmin.Status,
-                    UserCount = superAdmin.UserCount
-                };
-                return (Result.Success("Super admin user details retrieval was successful"), user);
-            }
-            catch (Exception ex)
-            {
-
-                throw ex;
-            }
-        }
-
         public async Task<(Result result, User user)> GetUserByEmail(string email)
         {
             try
@@ -271,6 +244,25 @@ namespace Comgo.Infrastructure.Services
                     IsWalletCreated = existingUser.IsWalletCreated,
                 };
                 return (Result.Success("User details retrieval was successful"), user);
+            }
+            catch (Exception ex)
+            {
+
+                throw ex;
+            }
+        }
+
+        public async Task<UserLogin> GetUserToken(User user)
+        {
+            try
+            {
+                var jwtToken = GenerateJwtToken(user.UserId, user.Name);
+                var userLogin = new UserLogin
+                {
+                    UserId = user.UserId,
+                    Token = jwtToken
+                };
+                return userLogin;
             }
             catch (Exception ex)
             {
@@ -354,6 +346,8 @@ namespace Comgo.Infrastructure.Services
                     return Result.Failure("Invalid user details specified");
                 }
                 existingUser.Name = user.Name;
+                existingUser.Bio = user.Bio;
+                existingUser.Location = user.Location;
                 existingUser.PublicKey = user.PublicKey;
                 existingUser.Status = user.Status;
                 existingUser.Descriptor = user.Descriptor;
