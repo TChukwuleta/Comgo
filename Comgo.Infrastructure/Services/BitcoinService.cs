@@ -1,7 +1,6 @@
 ﻿using Comgo.Application.Common.Interfaces;
 using Comgo.Application.Common.Model.Response.BitcoinCommandResponses;
 using Comgo.Core.Entities;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using NBitcoin;
 using NBitcoin.RPC;
@@ -113,13 +112,22 @@ namespace Comgo.Infrastructure.Services
             {
                 var userRpc = await CreateRpcClient(user.Walletname);
                 var descriptorResponse = await userRpc.SendCommandAsync("listdescriptors");
-                var userDescriptor = JsonConvert.DeserializeObject<ListDescriptorsResponse>(descriptorResponse.ResultString).descriptors.FirstOrDefault()?.desc;
-                string[] partsOne = userDescriptor.Split('[');
+                var allDescriptors = JsonConvert.DeserializeObject<ListDescriptorsResponse>(descriptorResponse.ResultString);
+                var isWpkh = allDescriptors.descriptors.FirstOrDefault(c => c.desc.Substring(0, 4) == "wpkh");
+                if (isWpkh == null)
+                {
+                    return (false, "Unable to get descriptor. Please contact support");
+                }
+                //var userDescriptor = JsonConvert.DeserializeObject<ListDescriptorsResponse>(descriptorResponse.ResultString).descriptors.FirstOrDefault()?.desc;
+                string[] partsOne = isWpkh.desc.Split('[');
                 string strippedUserDescriptor = partsOne[1].Split(')')[0];
                 string descriptor = $"wsh(sortedmulti(2,{adminDescriptor},[{strippedUserDescriptor}))";
+
+                Console.WriteLine($"Descriptor without checksum: {descriptor}");
                 var getdescriptorInfo = await userRpc.SendCommandAsync("getdescriptorinfo", descriptor);
                 var descriptorInfo = JsonConvert.DeserializeObject<DescriptorInfoResponse>(getdescriptorInfo.ResultString);
                 descriptor = $"{descriptor}#{descriptorInfo.checksum}";
+                Console.WriteLine($"Descriptor with checksum: {descriptor}");
                 user.Descriptor = _encryptionService.EncryptData(descriptor);
                 await _authService.UpdateUserAsync(user);
                 var rpc = await CreateRpcClient(_walletname);
@@ -172,7 +180,6 @@ namespace Comgo.Infrastructure.Services
             {
                 var rpc = await CreateRpcClient(_walletname);
                 var btcAddress = BitcoinAddress.Create(address, _network);
-
                 TxIn[] inputs = new TxIn[] { };
                 var outputs = new Dictionary<BitcoinAddress, string>()
                 {
@@ -194,27 +201,17 @@ namespace Comgo.Infrastructure.Services
             }
         }
 
-        public async Task<(bool success, object message)> ProcessPSBTAsync(string walletname, string psbt)
+        public async Task<(bool success, string message, bool isComplete)> ProcessPSBTAsync(string walletname, string psbt)
         {
             try
             {
                 var rpc = await CreateRpcClient(walletname);
-                PSBT.TryParse(psbt, _network, out PSBT request);
+                NBitcoin.PSBT.TryParse(psbt, _network, out NBitcoin.PSBT request);
                 var processPSBT = await rpc.WalletProcessPSBTAsync(request);
 
                 var strr = processPSBT.PSBT.ToString();
                 var hxx = processPSBT.PSBT.ToHex();
                 var b64 = processPSBT.PSBT.ToBase64();
-
-                if (processPSBT.Complete)
-                {
-                    var completePSBT = await FinalizePSBTAsync(walletname, b64);
-                    if (!completePSBT.success)
-                    {
-                        return (false, "Failed transaction");
-                    }
-                    return(true, completePSBT.message);
-                }
                 var psbtResponse = new
                 {
                     Value = processPSBT.PSBT.ToString(),
@@ -222,7 +219,8 @@ namespace Comgo.Infrastructure.Services
                     Base64Value = processPSBT.PSBT.ToBase64(),
                     IsComplete = processPSBT.Complete
                 };
-                return (true, psbtResponse);
+                Console.WriteLine(JsonConvert.SerializeObject(psbtResponse));
+                return (true, processPSBT.PSBT.ToBase64(), processPSBT.Complete);
             }
             catch (Exception ex)
             {
@@ -230,12 +228,34 @@ namespace Comgo.Infrastructure.Services
             }
         }
 
-        public async Task<(bool success, object message)> FinalizePSBTAsync(string walletname, string psbt)
+        public async Task<(bool success, string message)> CombinePSBTAsync(string walletname, string psbt_one, string psbt_two)
         {
             try
             {
                 var rpc = await CreateRpcClient(walletname);
-                PSBT.TryParse(psbt, _network, out PSBT request);
+                NBitcoin.PSBT.TryParse(psbt_one, _network, out NBitcoin.PSBT firstPsbt);
+                NBitcoin.PSBT.TryParse(psbt_two, _network, out NBitcoin.PSBT secondPsbt);
+                var psbts = new List<string>
+                {   
+                    psbt_one, psbt_two 
+                };
+
+                var psbtRequest = JsonConvert.SerializeObject(psbts);
+                var finalizePSBT = await rpc.SendCommandAsync("combinepsbt", psbtRequest);
+                return (true, finalizePSBT.ResultString);
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+
+        public async Task<(bool success, string message)> FinalizePSBTAsync(string walletname, string psbt)
+        {
+            try
+            {
+                var rpc = await CreateRpcClient(walletname);
+                NBitcoin.PSBT.TryParse(psbt, _network, out NBitcoin.PSBT request);
                 var finalizePSBT = await rpc.SendCommandAsync("finalizepsbt", request);
                 var finalePSBT = JsonConvert.DeserializeObject<FInalizePSBTResponse>(finalizePSBT.ResultString);
                 var broadcastTxn = await rpc.SendCommandAsync("sendrawtransaction", finalePSBT.hex);
@@ -246,7 +266,28 @@ namespace Comgo.Infrastructure.Services
                     HexValue = finalePSBT.hex,
                     Complete = finalePSBT.complete
                 };
-                return (true, response);
+                Console.WriteLine(JsonConvert.SerializeObject(response));
+                return (true, finalePSBT.hex);
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+
+        public async Task<(bool success, string message)> BroadcastTransaction(string walletname, string hex)
+        {
+            try
+            {
+                var rpc = await CreateRpcClient(walletname);
+                var hexList = new List<string>
+                {
+                    hex
+                };
+                var request = JsonConvert.SerializeObject(hexList);
+                var finalizePSBT = await rpc.SendCommandAsync("testmempoolaccept", request);
+                var broadcastTxn = await rpc.SendCommandAsync("sendrawtransaction", hex);
+                return (true, broadcastTxn.ResultString);
             }
             catch (Exception ex)
             {

@@ -2,11 +2,6 @@
 using Comgo.Core.Entities;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Comgo.Infrastructure.Data
 {
@@ -19,6 +14,9 @@ namespace Comgo.Infrastructure.Data
         public DbSet<AppUser> AppUsers { get; set; }
         public DbSet<Transaction> Transactions { get; set; }
         public DbSet<Signature> Signatures { get; set; }
+        public DbSet<SecurityQuestion> SecurityQuestions { get; set; }
+        public DbSet<PSBT> PSBTs { get; set; }
+        public DbSet<UserSetting> UserSettings { get; set; }
 
         public Task<int> SaveChangesAsync(CancellationToken cancellationToken = new CancellationToken())
         {

@@ -96,6 +96,34 @@ namespace Comgo.Api.Controllers
             }
         }
 
+        [HttpPost("updatesecurityquestion")]
+        public async Task<ActionResult<Result>> UpdateSecurityQuestion(UpdateUserSecurityQuestionCommand command)
+        {
+            try
+            {
+                accessToken.ValidateToken(command.UserId);
+                return await _mediator.Send(command);
+            }
+            catch (Exception ex)
+            {
+                return Result.Failure($"Failed to update security question. Error: {ex?.Message ?? ex?.InnerException?.Message}");
+            }
+        }
+
+        [HttpPost("updatefundslocktime")]
+        public async Task<ActionResult<Result>> UpdateFundsLocktime(UpdateFundsLockingTimeCommand command)
+        {
+            try
+            {
+                accessToken.ValidateToken(command.UserId);
+                return await _mediator.Send(command);
+            }
+            catch (Exception ex)
+            {
+                return Result.Failure($"Failed to update funding locktime. Error: {ex?.Message ?? ex?.InnerException?.Message}");
+            }
+        }
+
         [HttpGet("generateaddress/{userId}")]
         public async Task<ActionResult<Result>> GenerateAddress(string userId)
         {

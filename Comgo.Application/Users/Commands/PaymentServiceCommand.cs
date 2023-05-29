@@ -6,11 +6,8 @@ using Comgo.Core.Enums;
 using Comgo.Core.Model;
 using MediatR;
 using Microsoft.Extensions.Configuration;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using QRCoder;
+using System.Drawing;
 
 namespace Comgo.Application.Users.Commands
 {
@@ -26,12 +23,15 @@ namespace Comgo.Application.Users.Commands
         private readonly IAuthService _authService;
         private readonly ILightningService _lightningService;
         private readonly IPaystackService _paystackService;
-        public PaymentServiceCommandHandler(IConfiguration config, IAuthService authService, IPaystackService paystackService, ILightningService lightningService)
+        private readonly ICloudinaryService _cloudinaryService;
+        public PaymentServiceCommandHandler(IConfiguration config, IAuthService authService, IPaystackService paystackService, 
+            ILightningService lightningService, ICloudinaryService cloudinaryService)
         {
             _config = config;
             _lightningService = lightningService;
             _authService = authService;
             _paystackService = paystackService;
+            _cloudinaryService = cloudinaryService;
         }
 
         public async Task<Result> Handle(PaymentServiceCommand request, CancellationToken cancellationToken)
@@ -61,10 +61,19 @@ namespace Comgo.Application.Users.Commands
                         {
                             return Result.Failure("An error occured while generating invoice");
                         }
+                        QRCodeGenerator qrGenerator = new QRCodeGenerator();
+                        QRCodeData qrCodeData = qrGenerator.CreateQrCode(generateLightning, QRCodeGenerator.ECCLevel.Q);
+                        QRCode qrCode = new QRCode(qrCodeData);
+                        Bitmap qrCodeImage = qrCode.GetGraphic(10);
+                        Random random = new Random();
+                        var location = $"{random.Next()}";
+                        qrCodeImage.Save($"{location}.jpg");
+                        var invoice = await _cloudinaryService.UploadInvoiceQRCode(location);
                         PaystackInitializationResponse lightningResponse = new()
                         {
                             authorization_url = generateLightning,
-                            reference = reference
+                            reference = reference,
+                            image = invoice
                         };
                         return Result.Success("Invoice generation was successful", lightningResponse);
                         break;

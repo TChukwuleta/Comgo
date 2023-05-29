@@ -12,6 +12,7 @@
     <PackageReference Include="MimeKit" Version="3.5.0" />
     <PackageReference Include="NBitcoin" Version="7.0.24" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.2" />
+    <PackageReference Include="QRCoder" Version="1.4.1" />
   </ItemGroup>
 
   <ItemGroup>
@@ -22,6 +23,7 @@
     <Folder Include="BitcoinMethods\Queries\" />
     <Folder Include="Lightnings\Queries\" />
     <Folder Include="Paystacks\Queries\" />
+    <Folder Include="PSBTs\Queries\" />
     <Folder Include="Signatures\Queries\" />
   </ItemGroup>
 

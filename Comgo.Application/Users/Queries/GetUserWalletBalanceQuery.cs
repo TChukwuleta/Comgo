@@ -2,6 +2,7 @@
 using Comgo.Application.Common.Interfaces.Validators;
 using Comgo.Core.Model;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 
 namespace Comgo.Application.Users.Queries
 {
@@ -14,10 +15,12 @@ namespace Comgo.Application.Users.Queries
     {
         private readonly IAuthService _authService;
         private readonly IBitcoinService _bitcoinService;
-        public GetUserWalletBalanceQueryHandler(IAuthService authService, IBitcoinService bitcoinService)
+        private readonly IAppDbContext _context;
+        public GetUserWalletBalanceQueryHandler(IAuthService authService, IBitcoinService bitcoinService, IAppDbContext context)
         {
             _authService = authService;
             _bitcoinService = bitcoinService;
+            _context = context;
         }
 
         public async Task<Result> Handle(GetUserWalletBalanceQuery request, CancellationToken cancellationToken)
@@ -29,12 +32,17 @@ namespace Comgo.Application.Users.Queries
                 {
                     return Result.Failure("No user found");
                 }
-                var generatedAddress = await _bitcoinService.GetDescriptorBalance(result.user.Descriptor);
-                if (!generatedAddress.success)
+                var userSettings = await _context.UserSettings.FirstOrDefaultAsync(c => c.UserId == request.UserId);
+                if (userSettings == null || userSettings?.SecurityQuestionId <= 0)
+                {
+                    return Result.Failure("Kindly set up your security question and response to proceed");
+                }
+                var walletBalance = await _bitcoinService.GetDescriptorBalance(result.user.Descriptor);
+                if (!walletBalance.success)
                 {
                     return Result.Failure("An error occured while trying to retrieve user balance. Please contact support");
                 }
-                return Result.Success("User wallet balance retrieved successfully", $"{generatedAddress.amount} BTC");
+                return Result.Success("User wallet balance retrieved successfully", $"{walletBalance.amount} BTC");
             }
             catch (Exception ex)
             {

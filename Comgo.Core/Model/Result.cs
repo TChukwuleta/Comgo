@@ -20,6 +20,14 @@ namespace Comgo.Core.Model
             Entity = result;
         }
 
+        internal Result(bool succeeded, string message, object result = null, bool isPaid = false)
+        {
+            Succeeded = succeeded;
+            Message = message;
+            Entity = result;
+            IsPaid = isPaid;
+        }
+
         internal Result(bool succeeded, object result)
         {
             Succeeded = succeeded;
@@ -34,6 +42,7 @@ namespace Comgo.Core.Model
         public object Entity { get; set; }
         public string Error { get; set; }
         public string Message { get; set; }
+        public bool IsPaid { get; set; }
         public string[] Messages { get; set; }
 
         public static Result Success()
@@ -51,6 +60,11 @@ namespace Comgo.Core.Model
         }
 
         public static Result Success(string message, object entity)
+        {
+            return new Result(true, message, entity);
+        }
+
+        public static Result Success(string message, object entity, bool isPaid)
         {
             return new Result(true, message, entity);
         }

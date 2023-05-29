@@ -10,5 +10,6 @@ namespace Comgo.Application.Common.Interfaces
     {
         Task<string> FromBase64ToFile(string base64File, string filename);
         Task<string> UploadImage(string base64string, string userid);
+        Task<string> UploadInvoiceQRCode(string location);
     }
 }

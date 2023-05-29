@@ -1,8 +1,10 @@
 ﻿using Comgo.Application.Common.Interfaces;
 using Comgo.Application.Common.Interfaces.Validators;
+using Comgo.Application.PSBTs.Commands;
 using Comgo.Application.Transactions.Commands;
 using Comgo.Core.Model;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 
 namespace Comgo.Application.Users.Commands
 {
@@ -12,6 +14,7 @@ namespace Comgo.Application.Users.Commands
         public string Description { get; set; }
         public string DestinationAddress { get; set; }
         public string UserId { get; set; }
+        public bool ShouldProcessPSBT { get; set; }
     }
 
     public class InitiatePaymentCommandHandler : IRequestHandler<InitiatePaymentCommand, Result>
@@ -35,6 +38,16 @@ namespace Comgo.Application.Users.Commands
                 if (user.user == null)
                 {
                     return Result.Failure("Transaction creation failed. Invalid user details");
+                }
+                var userSettings = await _context.UserSettings.FirstOrDefaultAsync(c => c.UserId == request.UserId);
+                if (userSettings == null || userSettings?.SecurityQuestionId <= 0)
+                {
+                    return Result.Failure("Kindly set up your security question and response to proceed");
+                }
+                var walletBalance = await _bitcoinService.GetDescriptorBalance(user.user.Descriptor);
+                if (walletBalance.amount <= request.AmountInBtc)
+                {
+                    return Result.Failure("Insufficient balance. Kindly fund your wallet to proceed with this transaction or try with a lower amount");
                 }
                 var address = await _bitcoinService.GenerateDescriptorAddress(user.user.Descriptor);
                 if (!address.success)
@@ -62,6 +75,17 @@ namespace Comgo.Application.Users.Commands
                 if (createTransaction == null)
                 {
                     return Result.Failure("An error occured while trying to create new transaction");
+                }
+                var psbtRecord = new CreatePSBTRecordCommand
+                {
+                    UserId = request.UserId,
+                    Reference = reference,
+                    ShouldProcessPSBT = request.ShouldProcessPSBT
+                };
+                var psbtRecordHandler = await new CreatePSBTRecordCommandHandler(_context).Handle(psbtRecord, cancellationToken);
+                if (!psbtRecordHandler.Succeeded)
+                {
+                    return Result.Failure(psbtRecordHandler.Message);
                 }
                 return Result.Success(confirmUserTransaction.message);
             }

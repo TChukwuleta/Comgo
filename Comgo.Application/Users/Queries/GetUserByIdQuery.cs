@@ -2,11 +2,6 @@
 using Comgo.Application.Common.Interfaces.Validators;
 using Comgo.Core.Model;
 using MediatR;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Comgo.Application.Users.Queries
 {
@@ -18,9 +13,11 @@ namespace Comgo.Application.Users.Queries
     public class GetUserByIdQueryHandler : IRequestHandler<GetUserByIdQuery, Result>
     {
         private readonly IAuthService _authService;
-        public GetUserByIdQueryHandler(IAuthService authService)
+        private readonly IEncryptionService _encryptionService;
+        public GetUserByIdQueryHandler(IAuthService authService, IEncryptionService encryptionService)
         {
             _authService = authService;
+            _encryptionService = encryptionService;
         }
 
         public async Task<Result> Handle(GetUserByIdQuery request, CancellationToken cancellationToken)
@@ -31,6 +28,10 @@ namespace Comgo.Application.Users.Queries
                 if (result.user == null)
                 {
                     return Result.Failure("No user found");
+                }
+                if (!string.IsNullOrEmpty(result.user.Descriptor))
+                {
+                    result.user.Descriptor = _encryptionService.DecryptData(result.user.Descriptor);
                 }
                 return Result.Success(result.user);
             }

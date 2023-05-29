@@ -2,6 +2,7 @@
 using Comgo.Application.Common.Interfaces.Validators;
 using Comgo.Core.Model;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 
 namespace Comgo.Application.Users.Queries
 {
@@ -14,12 +15,14 @@ namespace Comgo.Application.Users.Queries
     {
         private readonly IAuthService _authService;
         private readonly IBitcoinService _bitcoinService;
+        private readonly IAppDbContext _appDbContext;
         private readonly IEncryptionService _encryptionService;
-        public GetNewUserMultisigAddressQueryHandler(IAuthService authService, IBitcoinService bitcoinService, IEncryptionService encryptionService)
+        public GetNewUserMultisigAddressQueryHandler(IAuthService authService, IBitcoinService bitcoinService, IEncryptionService encryptionService, IAppDbContext appDbContext)
         {
             _authService = authService;
             _bitcoinService = bitcoinService;
             _encryptionService = encryptionService;
+            _appDbContext = appDbContext;
         }
 
         public async Task<Result> Handle(GetNewUserMultisigAddressQuery request, CancellationToken cancellationToken)
@@ -31,6 +34,11 @@ namespace Comgo.Application.Users.Queries
                 if (user.user == null)
                 {
                     return Result.Failure("Unable to generate descriptor address. Invalid user specified");
+                }
+                var userSettings = await _appDbContext.UserSettings.FirstOrDefaultAsync(c => c.UserId == request.UserId);
+                if (userSettings == null || userSettings?.SecurityQuestionId <= 0)
+                {
+                    return Result.Failure("Kindly set up your security question and response to proceed");
                 }
                 if (string.IsNullOrEmpty(user.user.Descriptor))
                 {
@@ -50,7 +58,7 @@ namespace Comgo.Application.Users.Queries
                 {
                     return Result.Failure(deriveAddress.message);
                 }
-                return Result.Success(deriveAddress.message);
+                return Result.Success("Wallet address generated successfully", deriveAddress.message);
             }
             catch (Exception ex)
             {

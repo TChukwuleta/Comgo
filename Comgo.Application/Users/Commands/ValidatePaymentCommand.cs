@@ -1,5 +1,6 @@
 ﻿using Comgo.Application.Common.Interfaces;
 using Comgo.Application.Common.Interfaces.Validators;
+using Comgo.Application.Common.Model.Response;
 using Comgo.Core.Model;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -30,6 +31,8 @@ namespace Comgo.Application.Users.Commands
 
         public async Task<Result> Handle(ValidatePaymentCommand request, CancellationToken cancellationToken)
         {
+            PSBTResponse response = default;
+            var walletname = _config["Bitcoin:adminwallet"];
             try
             {
                 var user = await _authService.GetUserById(request.UserId);
@@ -42,22 +45,35 @@ namespace Comgo.Application.Users.Commands
                 {
                     return Result.Failure("No record found");
                 }
-                if (transaction.TransactionStatus != Core.Enums.TransactionStatus.Initiated)
+                if (transaction.TransactionStatus != Core.Enums.TransactionStatus.Initiated || transaction.TransactionStatus != Core.Enums.TransactionStatus.Processing)
                 {
                     return Result.Failure($"This transaction has been {transaction.TransactionStatus.ToString()}");
                 }
-                var createPsbt = await _bitcoinService.CreateWalletPSTAsync(transaction.Amount, transaction.CreditAddress);
-                if (!createPsbt.success)
+                var psbtRecord = await _context.PSBTs.FirstOrDefaultAsync(c => c.Reference == transaction.TransactionReference);
+                if (psbtRecord == null)
+                {
+                    return Result.Failure("Mismatched transaction reference. Please contact support");
+                }
+                var psbt = await _bitcoinService.CreateWalletPSTAsync(transaction.Amount, transaction.CreditAddress);
+                if (!psbt.success)
                 {
                     return Result.Failure("An error occured while generating PSBT for the transaction");
                 }
-                var walletname = _config["Bitcoin:adminwallet"];
-                var processPsbt = await _bitcoinService.ProcessPSBTAsync(walletname, createPsbt.message.psbt.ToString());
-                if (!processPsbt.success)
+                response.InitialPSBT = psbt.message.psbt.ToString();
+                if (psbtRecord.ShouldProcessPSBT)
                 {
-                    return Result.Failure("An error occured while processing PSBT");
+                    // Sign PSBT record for both the system as well as the user, combine both PSBTs, finalize and then broadcast it
                 }
-                return Result.Success(processPsbt.message);
+                else
+                {
+                    var processPsbt = await _bitcoinService.ProcessPSBTAsync(walletname, psbt.message.psbt.ToString());
+                    if (!processPsbt.success)
+                    {
+                        return Result.Failure("An error occured while processing PSBT");
+                    }
+                    response.SystemSignedPSBT = processPsbt.message;
+                }
+                return Result.Success(response);
             }
             catch (Exception ex)
             {

@@ -40,11 +40,6 @@ namespace Comgo.Infrastructure.Services
                 {
                     return Result.Failure("Please kindly input your correct password");
                 }
-                var confirmNewPassword = await _userManager.CheckPasswordAsync(user, newPassword);
-                if (!confirmNewPassword)
-                {
-                    return Result.Failure("Please enter a different password");
-                }
                 var changePassword = await _userManager.ChangePasswordAsync(user, oldPassword, newPassword);
                 if (!changePassword.Succeeded)
                 {
@@ -71,6 +66,7 @@ namespace Comgo.Infrastructure.Services
                 var newUser = new AppUser
                 {
                     Name = user.Name,
+                    PublicKey = user.PublicKey,
                     Email = user.Email,
                     Status = Status.Active,
                     UserName = user.Email,
@@ -78,7 +74,7 @@ namespace Comgo.Infrastructure.Services
                     WalletName = user.Walletname,
                     HasPaid = false,
                     IsWalletCreated = false,
-                    EmailConfirmed = true,
+                    EmailConfirmed = false,
                     UserType = user.UserType
                 };
                 var result = await _userManager.CreateAsync(newUser, user.Password);
@@ -193,7 +189,7 @@ namespace Comgo.Infrastructure.Services
             }
         }
 
-        public async Task<(Result result, User user)> GetUserByEmail(string email)
+        public async Task<(Result result, User user)> GetUserByEmail(string email) 
         {
             try
             {
@@ -236,6 +232,8 @@ namespace Comgo.Infrastructure.Services
                 {
                     Name = existingUser.Name,
                     Email = existingUser.UserName,
+                    Location = existingUser.Location,
+                    Bio = existingUser.Bio,
                     UserId = existingUser.Id,
                     Descriptor = existingUser.Descriptor,
                     Walletname = existingUser.WalletName,
