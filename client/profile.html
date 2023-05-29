@@ -86,6 +86,9 @@
     <a href="#billing" data-toggle="tab" class="nav-item nav-link has-icon nav-link-faded">
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-credit-card mr-2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>Transactions
     </a>
+    <a href="#payment" data-toggle="tab" class="nav-item nav-link has-icon nav-link-faded">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-credit-card mr-2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>Payment
+    </a>
 </nav>
 </div>
 </div>
@@ -106,6 +109,9 @@
         <li class="nav-item">
             <a href="#billing" data-toggle="tab" class="nav-link has-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-credit-card"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg></a>
         </li>
+        <li class="nav-item">
+            <a href="#payment" data-toggle="tab" class="nav-link has-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-credit-card"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg></a>
+        </li>
     </ul>
 </div>
 <div class="card-body tab-content">
@@ -113,33 +119,41 @@
 <div class="tab-pane active" id="profile">
     <h6>YOUR PROFILE INFORMATION</h6>
     <hr>
-    <form onsubmit="return GetUser()">
+    <form onsubmit="return UpdateUserProfile()">
         <div class="form-group">
             <label for="fullName">Name</label>
             <input type="text" class="form-control" id="fullName" aria-describedby="fullNameHelp" placeholder="Enter your fullname" value="">
         </div>
         <div class="form-group">
+            <label for="location">Email</label>
+            <input type="text" class="form-control" id="user_email" readonly>
+        </div>
+        <div class="form-group">
             <label for="bio">Your Bio</label>
-            <textarea class="form-control autosize" id="bio" placeholder="Write something about you" style="overflow: hidden; overflow-wrap: break-word; resize: none; height: 62px;">A front-end developer that focus more on user interface design, a web interface wizard, a connector of awesomeness.</textarea>
+            <textarea class="form-control autosize" id="bio" placeholder="Write something about you" style="overflow: hidden; overflow-wrap: break-word; resize: none; height: 62px;"></textarea>
+        </div>
+        <div class="form-group">
+            <label for="bio">Descriptor</label>
+            <textarea class="form-control autosize" id="descriptor" style="overflow: hidden; overflow-wrap: break-word; resize: none; height: 62px;"></textarea>
         </div>
         <div class="form-group">
             <label for="location">Location</label>
             <input type="text" class="form-control" id="location" placeholder="Enter your location" value="Bay Area, San Francisco, CA">
         </div>
-        <button type="button" class="btn btn-primary">Update Profile</button>
+        <button type="submit" class="btn btn-primary">Update Profile</button>
     </form>
 </div>
 
 <div class="tab-pane" id="security">
 <h6>SECURITY SETTINGS</h6>
 <hr>
-<form>
+<form onsubmit="return ChangeUserPassword()">
     <div class="form-group">
         <label class="d-block">Change Password</label>
-        <input type="text" class="form-control" placeholder="Enter your old password">
-        <input type="text" class="form-control mt-1" placeholder="New password">
+        <input type="text" id="old_password" class="form-control" placeholder="Enter your old password">
+        <input type="text" id="new_password" class="form-control mt-1" placeholder="New password">
     </div>
-    <button class="btn btn-info" type="button">Update Details</button>
+    <button class="btn btn-info" type="submit">Update Details</button>
 </form>
 <hr>
 <div class="form-group mb-0">
@@ -157,95 +171,97 @@
 </div>
 </div>
 <div class="tab-pane" id="notification">
-<h6>NOTIFICATION SETTINGS</h6>
-<hr>
-<form>
-<div class="form-group">
-<label class="d-block mb-0">Security Alerts</label>
-<div class="small text-muted mb-3">Receive security alert notifications via email</div>
-<div class="custom-control custom-checkbox">
-<input type="checkbox" class="custom-control-input" id="customCheck1" checked>
-<label class="custom-control-label" for="customCheck1">Email each time a vulnerability is found</label>
+    <h6>NOTIFICATION SETTINGS</h6>
+    <hr>
+    <form onsubmit="return UpdateSecurityQuestion()"> 
+        <div class="form-group">
+            <label class="d-block mb-0">Security Alerts</label>
+            <div class="small text-muted mb-3">Setup your security question and answer which would be required to retrieve your account should it get suspended</div>
+            </div>
+
+            <div class="px-3 pt-3">
+                <label for="security_questions" class="d-flex justify-content-between"><span class="labeltxt">Select a question</span></label>	
+                <select id="security_questions" class="form-control" required>
+                </select>
+            </div>
+            <div class="px-3 pt-3">	
+                <label for="card number" class="d-flex justify-content-between"><span class="labeltxt">Response</span></label>	
+                <input type="text" id="security_question_response" name="text" class="form-control inputtxt">	
+            </div>	<br />
+            <div>
+                <button type="submit" class="btn btn-primary payment">Update Settings</button>
+            </div>	
+    </form>
 </div>
-<div class="custom-control custom-checkbox">
-<input type="checkbox" class="custom-control-input" id="customCheck2" checked>
-<label class="custom-control-label" for="customCheck2">Email a digest summary of vulnerability</label>
-</div>
-</div>
-<div class="form-group mb-0">
-<label class="d-block">SMS Notifications</label>
-<ul class="list-group list-group-sm">
-<li class="list-group-item has-icon">
-Comments
-<div class="custom-control custom-control-nolabel custom-switch ml-auto">
-<input type="checkbox" class="custom-control-input" id="customSwitch1" checked>
-<label class="custom-control-label" for="customSwitch1"></label>
-</div>
-</li>
-<li class="list-group-item has-icon">
-Updates From People
-<div class="custom-control custom-control-nolabel custom-switch ml-auto">
-<input type="checkbox" class="custom-control-input" id="customSwitch2">
-<label class="custom-control-label" for="customSwitch2"></label>
-</div>
-</li>
-<li class="list-group-item has-icon">
-Reminders
-<div class="custom-control custom-control-nolabel custom-switch ml-auto">
-<input type="checkbox" class="custom-control-input" id="customSwitch3" checked>
-<label class="custom-control-label" for="customSwitch3"></label>
-</div>
-</li>
-<li class="list-group-item has-icon">
-Events
-<div class="custom-control custom-control-nolabel custom-switch ml-auto">
-<input type="checkbox" class="custom-control-input" id="customSwitch4" checked>
-<label class="custom-control-label" for="customSwitch4"></label>
-</div>
-</li>
-<li class="list-group-item has-icon">
-Pages You Follow
-<div class="custom-control custom-control-nolabel custom-switch ml-auto">
-<input type="checkbox" class="custom-control-input" id="customSwitch5">
-<label class="custom-control-label" for="customSwitch5"></label>
-</div>
-</li>
-</ul>
-</div>
-</form>
-</div>
+
 <div class="tab-pane" id="billing">
-<h6>TRANSACTIONS</h6>
-<hr>
-<form onsubmit="return GetNewBitcoinAddress()">
-    <div class="form-group">
-    <label class="d-block mb-0">Money man</label>
-        <div class="small text-muted mb-3">Ready to receive funds?</div>
-        <div class="small text-muted mb-3">
-            <p id="bitcoin_address"></p>
-        </div>
-        <div class="small text-muted mb-3" id="bitcoin_address"></div>
-            <button class="btn btn-info" type="button">Generate an address</button>
-        </div>
-    <div class="form-group mb-0">
-    <label class="d-block">Payment History</label>
-    <div class="border border-gray-500 bg-gray-200 p-3 text-center font-size-sm">You have not made any payment.</div>
+    <h6>TRANSACTIONS</h6>
+    <hr>
+    <form onsubmit="return GetNewBitcoinAddress()">
+        <div class="form-group">
+            <label class="d-block mb-0">Big man</label>
+            <div class="small text-muted mb-3">Ready to receive funds?</div>
+            <div class="small text-muted mb-3">
+                <p id="bitcoin_address"></p>
+            </div>
+            <div class="small text-muted mb-3" id="bitcoin_address"></div>
+                <button class="btn btn-info" type="submit">Generate an address</button>
+            </div>
+            <div class="form-group mb-0">
+            <label class="d-block">Payment History</label>
+            <table class="table border bg-white">
+                <thead>
+                    <tr>
+                        <th>Destination</th>
+                        <th>Amount (BTC)</th>
+                        <th>Reference</th>
+                        <th>Narration</th>
+                        <th>Transaction Status</th>
+                        <th>Date</th>
+                    </tr> 
+                </thead>
+                <tbody id="tablebody">
 
-    <table class="table border bg-white">
-        <thead>
-            <tr>
-                <th>Completed</th>
-                <th>ID</th>
-                <th>Title</th>
-                <th>UserId</th>
-            </tr>
-        </thead>
-        <tbody id="tablebody">
+                </tbody>
+            </table>
+        </div>
+    </form>
+</div>
 
-        </tbody>
-    </table>
-    </div>
-</form>
+<div class="tab-pane" id="payment">
+    <h6>READY TO SEND PAYMENT?</h6>
+    <hr>
+    <form onsubmit="return MakePayment()">
+        <div class="container mt-4 d-flex justify-content-center main">	
+            <div class="card">	
+                <div class="d-flex justify-content-between px-3 pt-4">	
+                    <span class="pay">Balance:</span>	
+                    <div class="amount" id="wallet_balance">
+                    <div class="inner">
+                    </div>
+                </div>	 
+            </div>	
+            <div class="px-3 pt-3">	
+                <label for="card number" class="d-flex justify-content-between"><span class="labeltxt">Destination Address</span></label>	
+                <input type="text" id="payment_destination" name="text" class="form-control inputtxt" placeholder="bcrt............">	
+            </div>	
+            <div class="px-3 pt-3">
+                <div class="form-group">
+                    <label for="bio">Description</label>
+                    <textarea class="form-control autosize" id="payment_description" style="overflow: hidden; overflow-wrap: break-word; resize: none; height: 62px;"></textarea>
+                </div>
+            </div>
+            <div class="d-flex justify-content-between px-3 pt-4">	
+                <label for="cvv" class="cvvtxt">Amount (BTC)</label>
+                <input type="number" step="0.01" id="payment_amount" name="number" class="form-control">
+            </div>
+            <div class="d-flex justify-content-between px-3 pt-4 pb-4">	
+                <div>
+                    <button type="submit" class="btn btn-primary payment">Make Payment</button>
+                </div>	
+            </div>	
+        </div>
+    </form>
 </div>
 </div>
 </div>

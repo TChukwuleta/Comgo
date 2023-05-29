@@ -31,6 +31,8 @@ function payForServiceCharge() {
                 case 1:
                     alert(data.message)
                 case 2:
+                    const queryString = `?invoice=${data.entity.authorization_url}&invoiceurl=${data.entity.image}`
+                    window.location.href = `lightning.html${queryString}`
                     break;
                 case 3:
                     window.location = data.entity.authorization_url
@@ -43,7 +45,7 @@ function payForServiceCharge() {
         }
     });
     return false;
-}
+} 
 
 
 function ServiceChargePage() {
